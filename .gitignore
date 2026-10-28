@@ -1,0 +1,37 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local SQLite databases
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+
+# Logs
+logs/
+*.log
+
+# Java and Maven build files
+target/
+*.class
+
+# Editor settings
+.vscode/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# Local environment settings
+.env
+.env.*
+
+# Operating system files
+.DS_Store
+Thumbs.db
