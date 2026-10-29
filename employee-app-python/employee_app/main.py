@@ -12,7 +12,7 @@ from employee_app.exceptions import (
     ValidationError,
 )
 from employee_app.services import login
-
+from employee_app.menu import run_menu
 
 def login_screen(connection):
     """Prompt for login and allow three incorrect attempts."""
@@ -70,8 +70,7 @@ def main():
             if user is None:
                 return 1
 
-            # Connect your teammate's menu here later.
-
+        run_menu(user)
         return 0
 
     except ExpenseManagerError as error:
