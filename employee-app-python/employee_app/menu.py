@@ -193,8 +193,25 @@ def handle_delete(conn_factory, user):
 
 
 def handle_history(conn_factory, user):
-    """Placeholder until T5P1-12 (review history) is merged."""
-    print("Review history is not available yet.")
+    # show approved and denied expenses with the manager's comment.
+    with conn_factory() as connection:
+        history = services.get_review_history(connection, user)
+
+    if not history:
+        print("No reviewed expenses found.")
+        return
+
+    print(f"\n{'ID':<6} {'Status':<10} {'Amount':>10} {'Reviewer':<16} {'Reviewed':<12} Comment")
+
+    for item in history:
+        print(
+            f"{item['expense_id']:<6} "
+            f"{item['status']:<10} "
+            f"{item['amount']:>10.2f} "
+            f"{item['reviewer']:<16} "
+            f"{item['review_date']:<12} "
+            f"{item['comment']}"
+        )
 
 
 def run_menu(user, conn_factory=get_connection):

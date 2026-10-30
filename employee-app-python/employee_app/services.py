@@ -130,10 +130,8 @@ def submit_expense(
     return expense_id
 
 def get_own_pending_expense(connection, user, expense_id):
-    """Return the expense if it exists, is the user's own, and is pending.
-
-    Raises NotFoundError, AuthorizationError or InvalidStateError (FR-E3, FR-A4).
-    """
+    # Return the expense if it exists, is the user's own, and is pending.
+    # Raises NotFoundError, AuthorizationError or InvalidStateError (FR-E3, FR-A4).
     require_employee(connection, user)
 
     expense = connection.execute(
@@ -157,15 +155,12 @@ def get_own_pending_expense(connection, user, expense_id):
     return expense
 
 
-def update_expense(
-    connection, user, expense_id, amount, category_id,
-    description, expense_date, today=None
-):
-    """validate and update a pending expense.
+def update_expense(connection, user, expense_id, amount, category_id, description, expense_date, today=None):
+    # validate and update a pending expense.
 
-    The pending check is repeated when saving, so a manager decision made while
-    the employee was typing is detected.
-    """
+    # The pending check is repeated when saving, so a manager decision made while
+    # the employee was typing is detected.
+    
     get_own_pending_expense(connection, user, expense_id)
 
     category_ids = {c["id"] for c in get_categories(connection, user)}
@@ -239,11 +234,11 @@ def view_expenses(connection, user, status=None):
         raise DatabaseError("Could not load expenses.") from error
 
 def delete_expense(connection, user, expense_id):
-    """delete a pending expense and its approval row together.
+    # delete a pending expense and its approval row together.
 
-    The pending check is repeated when deleting, so a manager decision made
-    while the employee was confirming is detected.
-    """
+    # The pending check is repeated when deleting, so a manager decision made
+    # while the employee was confirming is detected.
+    
     get_own_pending_expense(connection, user, expense_id)
 
     try:
@@ -269,3 +264,45 @@ def delete_expense(connection, user, expense_id):
     logger.info(
         "Expense deleted: expense_id=%s user_id=%s", expense_id, user["id"]
     )
+    
+def get_review_history(connection, user):
+    # return the employee's approved and denied expenses.
+
+    # newest review first. A missing or blank comment becomes "(no comment)".
+    
+    require_employee(connection, user)
+
+    try:
+        rows = connection.execute(
+            """
+            SELECT
+                e.id AS expense_id,
+                e.amount,
+                a.status,
+                r.full_name AS reviewer,
+                a.review_date,
+                a.comment
+            FROM approvals AS a
+            JOIN expenses AS e ON e.id = a.expense_id
+            LEFT JOIN users AS r ON r.id = a.reviewer_id
+            WHERE e.user_id = ?
+              AND a.status IN ('approved', 'denied')
+            ORDER BY a.review_date DESC, a.id DESC
+            """,
+            (user["id"],),
+        ).fetchall()
+    except sqlite3.Error as error:
+        logger.exception("Could not load review history.")
+        raise DatabaseError("Could not load review history.") from error
+
+    return [
+        {
+            "expense_id": row["expense_id"],
+            "amount": round(row["amount"], 2),
+            "status": row["status"],
+            "reviewer": row["reviewer"] or "",
+            "review_date": row["review_date"] or "",
+            "comment": (row["comment"] or "").strip() or "(no comment)",
+        }
+        for row in rows
+    ]
