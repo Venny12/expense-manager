@@ -199,3 +199,41 @@ def update_expense(
     logger.info(
         "Expense edited: expense_id=%s user_id=%s", expense_id, user["id"]
     )
+def view_expenses(connection, user, status=None):
+    """FR-E2: return the employee's expenses, newest date first."""
+    require_employee(connection, user)
+
+    if status is not None and status not in (
+        "pending", "approved", "denied"
+    ):
+        raise ValidationError(
+            "Status must be pending, approved, or denied."
+        )
+
+    sql = """
+        SELECT
+            e.id,
+            e.expense_date,
+            c.name AS category,
+            e.amount,
+            a.status
+        FROM expenses AS e
+        JOIN categories AS c ON c.id = e.category_id
+        JOIN approvals AS a ON a.expense_id = e.id
+        WHERE e.user_id = ?
+    """
+
+    parameters = [user["id"]]
+
+    if status is not None:
+        sql += " AND a.status = ?"
+        parameters.append(status)
+
+    sql += " ORDER BY e.expense_date DESC, e.id DESC"
+
+    try:
+        return connection.execute(sql, parameters).fetchall()
+    except sqlite3.Error as error:
+        logger.exception("Could not load employee expenses.")
+        raise DatabaseError("Could not load expenses.") from error
+
