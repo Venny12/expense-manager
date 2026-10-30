@@ -7,6 +7,8 @@ from employee_app.exceptions import (
     AuthorizationError,
     ValidationError,
     DatabaseError, 
+    InvalidStateError,
+    NotFoundError,
 )
 
 logger = logging.getLogger(__name__)
@@ -126,3 +128,74 @@ def submit_expense(
         user["id"],
     )
     return expense_id
+
+def get_own_pending_expense(connection, user, expense_id):
+    """Return the expense if it exists, is the user's own, and is pending.
+
+    Raises NotFoundError, AuthorizationError or InvalidStateError (FR-E3, FR-A4).
+    """
+    require_employee(connection, user)
+
+    expense = connection.execute(
+        """
+        SELECT e.id, e.user_id, e.category_id, c.name AS category,
+               e.amount, e.description, e.expense_date, a.status
+        FROM expenses e
+        JOIN categories c ON c.id = e.category_id
+        LEFT JOIN approvals a ON a.expense_id = e.id
+        WHERE e.id = ?
+        """,
+        (expense_id,),
+    ).fetchone()
+
+    if expense is None:
+        raise NotFoundError("Expense not found.")
+    if expense["user_id"] != user["id"]:
+        raise AuthorizationError("You can only change your own expenses.")
+    if expense["status"] != "pending":
+        raise InvalidStateError("Expense is no longer pending.")
+    return expense
+
+
+def update_expense(
+    connection, user, expense_id, amount, category_id,
+    description, expense_date, today=None
+):
+    """FR-E3: validate and update a pending expense.
+
+    The pending check is repeated when saving, so a manager decision made while
+    the employee was typing is detected (XW-03).
+    """
+    get_own_pending_expense(connection, user, expense_id)
+
+    category_ids = {c["id"] for c in get_categories(connection, user)}
+    amount = validators.validate_amount(str(amount))
+    category_id = validators.validate_category(str(category_id), category_ids)
+    description = validators.validate_description(description)
+    expense_date = validators.validate_expense_date(expense_date, today=today)
+
+    try:
+        with connection:
+            cursor = connection.execute(
+                """
+                UPDATE expenses
+                SET amount = ?, category_id = ?, description = ?,
+                    expense_date = ?
+                WHERE id = ? AND user_id = ?
+                  AND EXISTS (SELECT 1 FROM approvals
+                              WHERE expense_id = expenses.id
+                                AND status = 'pending')
+                """,
+                (float(amount), category_id, description, expense_date,
+                 expense_id, user["id"]),
+            )
+    except sqlite3.Error as error:
+        logger.exception("Edit of expense %s failed.", expense_id)
+        raise DatabaseError("Could not save the expense.") from error
+
+    if cursor.rowcount == 0:
+        raise InvalidStateError("Expense is no longer pending.")
+
+    logger.info(
+        "Expense edited: expense_id=%s user_id=%s", expense_id, user["id"]
+    )
