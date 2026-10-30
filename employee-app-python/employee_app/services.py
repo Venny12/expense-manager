@@ -161,10 +161,10 @@ def update_expense(
     connection, user, expense_id, amount, category_id,
     description, expense_date, today=None
 ):
-    """FR-E3: validate and update a pending expense.
+    """validate and update a pending expense.
 
     The pending check is repeated when saving, so a manager decision made while
-    the employee was typing is detected (XW-03).
+    the employee was typing is detected.
     """
     get_own_pending_expense(connection, user, expense_id)
 
@@ -199,6 +199,7 @@ def update_expense(
     logger.info(
         "Expense edited: expense_id=%s user_id=%s", expense_id, user["id"]
     )
+    
 def view_expenses(connection, user, status=None):
     """FR-E2: return the employee's expenses, newest date first."""
     require_employee(connection, user)
@@ -237,3 +238,34 @@ def view_expenses(connection, user, status=None):
         logger.exception("Could not load employee expenses.")
         raise DatabaseError("Could not load expenses.") from error
 
+def delete_expense(connection, user, expense_id):
+    """delete a pending expense and its approval row together.
+
+    The pending check is repeated when deleting, so a manager decision made
+    while the employee was confirming is detected.
+    """
+    get_own_pending_expense(connection, user, expense_id)
+
+    try:
+        # Both rows are deleted together or neither is.
+        with connection:
+            cursor = connection.execute(
+                "DELETE FROM approvals WHERE expense_id = ? "
+                "AND status = 'pending'",
+                (expense_id,),
+            )
+
+            if cursor.rowcount == 0:
+                raise InvalidStateError("Expense is no longer pending.")
+
+            connection.execute(
+                "DELETE FROM expenses WHERE id = ? AND user_id = ?",
+                (expense_id, user["id"]),
+            )
+    except sqlite3.Error as error:
+        logger.exception("Delete of expense %s failed.", expense_id)
+        raise DatabaseError("Could not delete the expense.") from error
+
+    logger.info(
+        "Expense deleted: expense_id=%s user_id=%s", expense_id, user["id"]
+    )
