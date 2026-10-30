@@ -123,8 +123,51 @@ def handle_view(conn_factory, user):
 
 
 def handle_edit(conn_factory, user):
-    """Placeholder until T5P1-10 (edit expense) is merged."""
-    print("Edit expense is not available yet.")
+    """FR-E3: edit a pending expense. Enter keeps the current value."""
+    expense_id = _ask("Expense ID to edit: ", validators.validate_expense_id)
+
+    with conn_factory() as connection:
+        expense = services.get_own_pending_expense(connection, user, expense_id)
+        categories = services.get_categories(connection, user)
+
+    category_ids = {category["id"] for category in categories}
+
+    print("Press Enter to keep the current value.")
+    amount = _ask(
+        f"Amount [{expense['amount']:.2f}]: ",
+        validators.validate_amount,
+        keep=expense["amount"],
+    )
+
+    print("\nCategories:")
+    for category in categories:
+        print(f"{category['id']}. {category['name']}")
+
+    category_id = _ask(
+        f"Category number [{expense['category_id']} - {expense['category']}]: ",
+        lambda text: validators.validate_category(text, category_ids),
+        keep=expense["category_id"],
+    )
+    description = _ask(
+        f"Description [{expense['description']}]: ",
+        validators.validate_description,
+        keep=expense["description"],
+    )
+    expense_date = _ask(
+        f"Expense date [{expense['expense_date']}]: ",
+        validators.validate_expense_date,
+        keep=expense["expense_date"],
+    )
+
+    # A new connection is used for saving, so a decision made by a manager
+    # while the employee was typing is detected here (XW-03).
+    with conn_factory() as connection:
+        services.update_expense(
+            connection, user, expense_id,
+            amount, category_id, description, expense_date,
+        )
+
+    print(f"Expense {expense_id} updated.")
 
 
 def handle_delete(conn_factory, user):
