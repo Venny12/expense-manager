@@ -77,8 +77,49 @@ def handle_submit(conn_factory, user):
 
 
 def handle_view(conn_factory, user):
-    """Placeholder until T5P1-8 (view expenses) is merged."""
-    print("View expenses is not available yet.")
+    """Display the employee's expenses with an optional status filter."""
+    print("\nView expenses")
+    print("0. All")
+    print("1. Pending")
+    print("2. Approved")
+    print("3. Denied")
+
+    choice = _ask(
+        "Filter: ",
+        lambda text: validators.validate_menu_choice(
+            text, {0, 1, 2, 3}
+        ),
+    )
+
+    statuses = {
+        0: None,
+        1: "pending",
+        2: "approved",
+        3: "denied",
+    }
+
+    with conn_factory() as connection:
+        expenses = services.view_expenses(
+            connection, user, statuses[choice]
+        )
+
+    if not expenses:
+        print("No expenses found.")
+        return
+
+    print(
+        f"\n{'ID':<6} {'Date':<12} {'Category':<18} "
+        f"{'Amount':>10} {'Status':<10}"
+    )
+
+    for expense in expenses:
+        print(
+            f"{expense['id']:<6} "
+            f"{expense['expense_date']:<12} "
+            f"{expense['category']:<18} "
+            f"{expense['amount']:>10.2f} "
+            f"{expense['status']:<10}"
+        )
 
 
 def handle_edit(conn_factory, user):
