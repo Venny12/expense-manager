@@ -2,7 +2,7 @@
 
 import logging
 
-from employee_app import validators
+from employee_app import services, validators
 from employee_app.db import get_connection
 from employee_app.exceptions import ExpenseManagerError, ValidationError
 
@@ -32,8 +32,48 @@ def _ask(prompt, validate, keep=None):
 
 
 def handle_submit(conn_factory, user):
-    """Placeholder until T5P1-7 (submit expense) is merged."""
-    print("Submit expense is not available yet.")
+    """Collect expense details and save a pending expense."""
+    with conn_factory() as connection:
+        categories = services.get_categories(connection, user)
+
+    if not categories:
+        print("No expense categories available.")
+        return
+
+    amount = _ask("Amount: ", validators.validate_amount)
+
+    print("\nCategories:")
+    for category in categories:
+        print(f"{category['id']}. {category['name']}")
+
+    category_ids = {category["id"] for category in categories}
+
+    category_id = _ask(
+        "Category number: ",
+        lambda text: validators.validate_category(text, category_ids),
+    )
+
+    description = _ask(
+        "Description: ",
+        validators.validate_description,
+    )
+
+    expense_date = _ask(
+        "Expense date (YYYY-MM-DD, Enter = today): ",
+        validators.validate_expense_date,
+    )
+
+    with conn_factory() as connection:
+        expense_id = services.submit_expense(
+            connection,
+            user,
+            amount,
+            category_id,
+            description,
+            expense_date,
+        )
+
+    print(f"Expense submitted. ID: {expense_id}. Status: pending.")
 
 
 def handle_view(conn_factory, user):
