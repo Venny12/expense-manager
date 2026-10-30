@@ -123,7 +123,7 @@ def handle_view(conn_factory, user):
 
 
 def handle_edit(conn_factory, user):
-    """FR-E3: edit a pending expense. Enter keeps the current value."""
+    # edit a 'pending' expense. Enter keeps the current value.
     expense_id = _ask("Expense ID to edit: ", validators.validate_expense_id)
 
     with conn_factory() as connection:
@@ -160,7 +160,7 @@ def handle_edit(conn_factory, user):
     )
 
     # A new connection is used for saving, so a decision made by a manager
-    # while the employee was typing is detected here (XW-03).
+    # while the employee was typing is detected here.
     with conn_factory() as connection:
         services.update_expense(
             connection, user, expense_id,
@@ -171,8 +171,25 @@ def handle_edit(conn_factory, user):
 
 
 def handle_delete(conn_factory, user):
-    """Placeholder until T5P1-11 (delete expense) is merged."""
-    print("Delete expense is not available yet.")
+    expense_id = _ask("Expense ID to delete: ", validators.validate_expense_id)
+
+    with conn_factory() as connection:
+        expense = services.get_own_pending_expense(connection, user, expense_id)
+
+    print(
+        f"Expense {expense_id}: {expense['category']}, "
+        f"{expense['amount']:.2f}, {expense['description']}"
+    )
+    answer = input("Delete this expense? (y/n): ").strip()
+
+    if answer not in ("y", "Y"):
+        print("Deletion cancelled.")
+        return
+
+    with conn_factory() as connection:
+        services.delete_expense(connection, user, expense_id)
+
+    print(f"Expense {expense_id} deleted.")
 
 
 def handle_history(conn_factory, user):
