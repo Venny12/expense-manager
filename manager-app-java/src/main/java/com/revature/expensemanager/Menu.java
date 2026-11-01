@@ -4,6 +4,8 @@ import java.sql.Connection;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.io.Console;
+import java.util.function.Function;
 
 import com.revature.expensemanager.exceptions.ExpenseManagerException;
 import com.revature.expensemanager.validation.InputValidator;
@@ -25,21 +27,37 @@ public class Menu {
 
     private final User user;
     private final Connection connection;
-    private final Scanner scanner;
 
+    private final Function<String, String> input;
+
+     // Reads input from the console, the same way the login prompts do.
+    public Menu(User user, Connection connection, Console console) {
+        this(user, connection, prompt -> console.readLine("%s", prompt));
+    }
+
+    // Reads input from a Scanner. Used by tests with scripted input.
     public Menu(User user, Connection connection, Scanner scanner) {
+        this(user, connection, prompt -> {
+            System.out.print(prompt);
+            return scanner.hasNextLine() ? scanner.nextLine() : null;
+        });
+    }
+
+    private Menu(User user, Connection connection,
+                 Function<String, String> input) {
         this.user = user;
         this.connection = connection;
-        this.scanner = scanner;
+        this.input = input;
     }
 
     // Shows the menu until the user chooses 0.
     public void run() {
         while (true) {
             System.out.println(MENU);
-            System.out.print("Choice: ");
+            String line = input.apply("Choice: ");
+            //System.out.print("Choice: ");
 
-            if (!scanner.hasNextLine()) {
+            if (line == null) {
                 System.out.println();
                 System.out.println("Application closed.");
                 return;
@@ -48,9 +66,7 @@ public class Menu {
             int choice;
 
             try {
-                choice = InputValidator.parseMenuChoice(
-                    scanner.nextLine(), MAX_CHOICE
-                );
+                choice = InputValidator.parseMenuChoice(line, MAX_CHOICE);
             } catch (ExpenseManagerException error) {
                 System.out.println(error.getMessage());
                 continue;
