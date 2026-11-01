@@ -10,6 +10,8 @@ import java.util.Arrays;
 import java.util.logging.FileHandler;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
+import java.util.Scanner;
+import java.util.logging.Level;
 
 import com.revature.expensemanager.db.Database;
 import com.revature.expensemanager.exceptions.AuthenticationException;
@@ -17,6 +19,8 @@ import com.revature.expensemanager.exceptions.AuthorizationException;
 import com.revature.expensemanager.exceptions.ExpenseManagerException;
 import com.revature.expensemanager.exceptions.ValidationException;
 import com.revature.expensemanager.services.AuthenticationService;
+import com.revature.expensemanager.exceptions.ExpenseManagerException;
+import com.revature.expensemanager.validation.InputValidator;
 
 /** Starts the Manager App and handles login prompts. */
 public class Main {
@@ -91,6 +95,7 @@ public class Main {
                     System.out.println("Welcome, " + user.fullName());
 
                     // Connect the manager menu here later.
+                    new Menu(user, connection, new Scanner(System.in)).run();
                     return 0;
 
                 } catch (ValidationException error) {
