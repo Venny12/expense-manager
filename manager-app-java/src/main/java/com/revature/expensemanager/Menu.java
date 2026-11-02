@@ -6,6 +6,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.io.Console;
 import java.util.function.Function;
+import com.revature.expensemanager.dao.ExpenseDao;
+import com.revature.expensemanager.services.ExpenseService;
 
 import com.revature.expensemanager.exceptions.ExpenseManagerException;
 import com.revature.expensemanager.validation.InputValidator;
@@ -98,8 +100,28 @@ public class Menu {
     }
 
     /** Placeholder until T5P1-14 (list pending expenses) is merged. */
+       /** FR-M1: display all pending expenses, oldest first. */
     private void listPending() {
-        System.out.println("List pending expenses is not available yet.");
+        ExpenseService service = new ExpenseService(
+            new ExpenseDao(connection)
+        );
+
+        var expenses = service.listPending(user);
+
+        if (expenses.isEmpty()) {
+            System.out.println("No pending expenses.");
+            return;
+        }
+
+        for (PendingExpense expense : expenses) {
+            System.out.println();
+            System.out.println("ID: " + expense.id());
+            System.out.println("Employee: " + expense.employeeName());
+            System.out.println("Date: " + expense.expenseDate());
+            System.out.println("Category: " + expense.category());
+            System.out.println("Amount: " + expense.amount().toPlainString());
+            System.out.println("Description: " + expense.description());
+        }
     }
 
     /** Placeholder until T5P1-16 (approve and deny) is merged. */
