@@ -13,6 +13,7 @@ public final class InputValidator {
     private static final String EXPENSE_ID_RULE = "Expense ID must be a positive whole number.";
     private static final String DATE_RULE = "Dates must be in YYYY-MM-DD format.";
     private static final String DATE_RANGE_RULE = "The start date must be on or before the end date.";
+    // private static final String FUTURE_DATE_RULE = "Dates cannot be in the future.";
 
     // STRICT makes 2026-02-30 invalid instead of rolling it over to March.
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("uuuu-MM-dd").withResolverStyle(ResolverStyle.STRICT);

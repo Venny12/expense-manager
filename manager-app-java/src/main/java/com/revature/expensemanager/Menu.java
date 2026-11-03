@@ -6,8 +6,12 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.io.Console;
 import java.util.function.Function;
+import java.util.List;
 import com.revature.expensemanager.dao.ExpenseDao;
 import com.revature.expensemanager.services.ExpenseService;
+import com.revature.expensemanager.dao.ReportDao;
+import com.revature.expensemanager.services.ReportService;
+import com.revature.expensemanager.validation.InputValidator.DateRange;
 
 import com.revature.expensemanager.exceptions.ExpenseManagerException;
 import com.revature.expensemanager.validation.InputValidator;
@@ -215,6 +219,117 @@ public class Menu {
 
     /** Placeholder until T5P1-17 (spending reports) is merged. */
     private void reports() {
-        System.out.println("Reports are not available yet.");
+        ReportService service = new ReportService(new ReportDao(connection));
+        System.out.println();
+        System.out.println("--- Reports ---");
+        System.out.println("1. Spending by employee");
+        System.out.println("2. Spending by category");
+        System.out.println("0. Back");
+
+        Integer choice = askReportChoice();
+        if (choice == null || choice == 0) {
+            return;
+        }
+
+        ReportType type = choice == 1 ? ReportType.EMPLOYEE : ReportType.CATEGORY;
+
+        Boolean useRange = askYesNo("Limit to a date range? (y/n): ");
+        if (useRange == null) {
+            return;
+        }
+
+        DateRange range = null;
+        if (useRange) {
+            range = askDateRange();
+            if (range == null) {
+                return;
+            }
+        }
+
+        List<ReportRow> rows = service.report(user, type, range);
+        printReport(type, range, rows);
     }
+
+    private void printReport(ReportType type, DateRange range,
+                             List<ReportRow> rows) {
+        System.out.println();
+        System.out.println(
+            "Spending by " + type.columnTitle().toLowerCase()
+            + (range == null ? "" : " (" + range.start() + " to " + range.end() + ")")
+        );
+
+        if (rows.isEmpty()) {
+            System.out.println("No data for the selected criteria.");
+            return;
+        }
+
+        String format = "%-24s %6s %14s %16s%n";
+        System.out.printf(format, type.columnTitle(), "Count",
+                          "Total Amount", "Total Approved");
+
+        for (ReportRow row : rows) {
+            System.out.printf(format, row.name(), row.count(),
+                              row.totalAmount().toPlainString(),
+                              row.approvedAmount().toPlainString());
+        }
+    }
+
+    // Asks until the answer is 0, 1 or 2. Returns null if input ends.
+    private Integer askReportChoice() {
+        while (true) {
+            String line = input.apply("Choice: ");
+            if (line == null) {
+                return null;
+            }
+
+            try {
+                return InputValidator.parseMenuChoice(line, 2);
+            } catch (ExpenseManagerException error) {
+                System.out.println(error.getMessage());
+            }
+        }
+    }
+
+    // Asks until the answer is y or n. Returns null if input ends.
+    private Boolean askYesNo(String prompt) {
+        while (true) {
+            String line = input.apply(prompt);
+            if (line == null) {
+                return null;
+            }
+
+            String answer = line.trim().toLowerCase();
+            if (answer.equals("y")) {
+                return true;
+            }
+            if (answer.equals("n")) {
+                return false;
+            }
+
+            System.out.println("Please enter y or n.");
+        }
+    }
+
+    // Asks for both dates until they form a valid range (VR-07).
+    private DateRange askDateRange() {
+        while (true) {
+            String start = input.apply("Start date (YYYY-MM-DD): ");
+            if (start == null) {
+                return null;
+            }
+
+            String end = input.apply("End date (YYYY-MM-DD): ");
+            if (end == null) {
+                return null;
+            }
+
+            try {
+                return InputValidator.parseDateRange(start, end);
+            } catch (ExpenseManagerException error) {
+                System.out.println(error.getMessage());
+            }
+        }
+    }
+
+        
 }
