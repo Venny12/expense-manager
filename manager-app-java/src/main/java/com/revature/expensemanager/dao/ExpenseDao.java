@@ -8,6 +8,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.sql.Types;
+
 
 import com.revature.expensemanager.PendingExpense;
 
@@ -59,5 +61,53 @@ public class ExpenseDao {
         }
 
         return expenses;
+    }
+
+    /** Returns the approval status of an expense, or null if there is none. */
+    public String findStatus(int expenseId) throws SQLException {
+        String sql = "SELECT status FROM approvals WHERE expense_id = ?";
+
+        try (PreparedStatement statement =
+                 connection.prepareStatement(sql)) {
+
+            statement.setInt(1, expenseId);
+
+            try (ResultSet results = statement.executeQuery()) {
+                return results.next() ? results.getString("status") : null;
+            }
+        }
+    }
+
+    /**
+     * Saves a decision only while the expense is still pending.
+     * Returns false when nothing was changed, for example because another
+     * decision was saved first.
+     */
+    public boolean saveDecision(int expenseId, String status, int reviewerId,
+                                String comment, String reviewDate)
+            throws SQLException {
+        String sql = """
+            UPDATE approvals
+            SET status = ?, reviewer_id = ?, comment = ?, review_date = ?
+            WHERE expense_id = ? AND status = 'pending'
+            """;
+
+        try (PreparedStatement statement =
+                 connection.prepareStatement(sql)) {
+
+            statement.setString(1, status);
+            statement.setInt(2, reviewerId);
+
+            if (comment == null || comment.isBlank()) {
+                statement.setNull(3, Types.VARCHAR);
+            } else {
+                statement.setString(3, comment);
+            }
+
+            statement.setString(4, reviewDate);
+            statement.setInt(5, expenseId);
+
+            return statement.executeUpdate() == 1;
+        }
     }
 }
