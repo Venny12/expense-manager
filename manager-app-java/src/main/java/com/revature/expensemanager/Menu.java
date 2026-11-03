@@ -11,6 +11,7 @@ import com.revature.expensemanager.services.ExpenseService;
 
 import com.revature.expensemanager.exceptions.ExpenseManagerException;
 import com.revature.expensemanager.validation.InputValidator;
+import com.revature.expensemanager.validation.CommentValidator;
 
 // Manager menu
 public class Menu {
@@ -99,8 +100,7 @@ public class Menu {
         }
     }
 
-    /** Placeholder until T5P1-14 (list pending expenses) is merged. */
-       /** FR-M1: display all pending expenses, oldest first. */
+       /* FR-M1: display all pending expenses, oldest first. */
     private void listPending() {
         ExpenseService service = new ExpenseService(
             new ExpenseDao(connection)
@@ -124,9 +124,93 @@ public class Menu {
         }
     }
 
-    /** Placeholder until T5P1-16 (approve and deny) is merged. */
+    // approve, deny pending expense with a comment.
     private void reviewExpense() {
-        System.out.println("Review an expense is not available yet.");
+      ExpenseService service = new ExpenseService(new ExpenseDao(connection));
+
+        Integer expenseId = askExpenseId();
+        if (expenseId == null) {
+            return;
+        }
+        // Stop here if the expense is missing or already decided.
+        service.requirePending(user, expenseId);
+
+        String action = askAction();
+        if (action == null) {
+            return;
+        }
+
+        if (action.equals("a")) {
+            String comment = askComment(
+                "Comment (optional, Enter to skip): ", false
+            );
+            if (comment == null) {
+                return;
+            }
+
+            service.approve(user, expenseId, comment);
+            System.out.println("Expense " + expenseId + " approved.");
+        } else {
+            String comment = askComment(
+                "Comment (required, 5 to 200 characters): ", true
+            );
+            if (comment == null) {
+                return;
+            }
+
+            service.deny(user, expenseId, comment);
+            System.out.println("Expense " + expenseId + " denied.");
+        }
+    }
+// Asks until the expense ID is valid (VR-08). Returns null if input ends.
+    private Integer askExpenseId() {
+        while (true) {
+            String line = input.apply("Expense ID: ");
+            if (line == null) {
+                return null;
+            }
+
+            try {
+                return InputValidator.parseExpenseId(line);
+            } catch (ExpenseManagerException error) {
+                System.out.println(error.getMessage());
+            }
+        }
+    }
+
+    // Asks until the answer is a or d. Returns null if input ends.
+    private String askAction() {
+        while (true) {
+            String line = input.apply("Approve (a) or deny (d): ");
+            if (line == null) {
+                return null;
+            }
+
+            String answer = line.trim().toLowerCase();
+            if (answer.equals("a") || answer.equals("d")) {
+                return answer;
+            }
+
+            System.out.println("Please enter a to approve or d to deny.");
+        }
+    }
+
+    // Asks until the comment is valid (VR-05 or VR-06). Returns null if input ends.
+    private String askComment(String prompt, boolean required) {
+        while (true) {
+            String line = input.apply(prompt);
+            if (line == null) {
+                return null;
+            }
+
+            try {
+                return required
+                    ? CommentValidator.validateDenial(line)
+                    : CommentValidator.validateApproval(line);
+            } catch (ExpenseManagerException error) {
+                System.out.println(error.getMessage());
+            }
+        }
     }
 
     /** Placeholder until T5P1-17 (spending reports) is merged. */
