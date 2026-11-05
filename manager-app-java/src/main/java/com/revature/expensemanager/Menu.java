@@ -17,6 +17,12 @@ import com.revature.expensemanager.exceptions.ExpenseManagerException;
 import com.revature.expensemanager.validation.InputValidator;
 import com.revature.expensemanager.validation.CommentValidator;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.time.Clock;
+
+import com.revature.expensemanager.services.CsvExportService;
+
 // Manager menu
 public class Menu {
 
@@ -248,6 +254,33 @@ public class Menu {
 
         List<ReportRow> rows = service.report(user, type, range);
         printReport(type, range, rows);
+
+                if (rows.isEmpty()) {
+            return;
+        }
+
+        Boolean export = askYesNo("Export this report to CSV? (y/n): ");
+
+        if (!Boolean.TRUE.equals(export)) {
+            return;
+        }
+
+        CsvExportService exporter = new CsvExportService(
+            Path.of("..", "reports").toAbsolutePath().normalize(),
+            Clock.systemDefaultZone()
+        );
+
+        try {
+            Path savedFile = exporter.export(user, type, rows);
+            System.out.println("Report saved to: " + savedFile);
+
+        } catch (IOException | SecurityException error) {
+            LOGGER.log(Level.SEVERE, "CSV export failed.", error);
+            System.out.println(
+                "Could not save the CSV file. "
+                + "Check folder permissions or try again."
+            );
+        }
     }
 
     private void printReport(ReportType type, DateRange range,
