@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 import java.io.Console;
 import java.util.function.Function;
 import java.util.List;
+import java.util.ArrayList;
 import com.revature.expensemanager.dao.ExpenseDao;
 import com.revature.expensemanager.services.ExpenseService;
 import com.revature.expensemanager.dao.ReportDao;
@@ -117,15 +118,27 @@ public class Menu {
             return;
         }
 
+        List<String[]> rows = new ArrayList<>();
+
         for (PendingExpense expense : expenses) {
-            System.out.println();
-            System.out.println("ID: " + expense.id());
-            System.out.println("Employee: " + expense.employeeName());
-            System.out.println("Date: " + expense.expenseDate());
-            System.out.println("Category: " + expense.category());
-            System.out.println("Amount: " + expense.amount().toPlainString());
-            System.out.println("Description: " + expense.description());
+            rows.add(new String[] {
+                String.valueOf(expense.id()),
+                expense.employeeName(),
+                expense.expenseDate(),
+                expense.category(),
+                expense.amount().toPlainString(),
+                expense.description()
+            });
         }
+
+        System.out.println();
+        System.out.println(TableFormatter.format(
+            new String[] {"ID", "Employee", "Date", "Category", "Amount", "Description"},
+            rows,
+            new boolean[] {false, false, false, false, true, false},
+            new int[] {0, 0, 0, 0, 0, 40}
+        ));
+
     }
 
     // approve, deny pending expense with a comment.
@@ -217,7 +230,6 @@ public class Menu {
         }
     }
 
-    /** Placeholder until T5P1-17 (spending reports) is merged. */
     private void reports() {
         ReportService service = new ReportService(new ReportDao(connection));
         System.out.println();
@@ -263,15 +275,22 @@ public class Menu {
             return;
         }
 
-        String format = "%-24s %6s %14s %16s%n";
-        System.out.printf(format, type.columnTitle(), "Count",
-                          "Total Amount", "Total Approved");
-
+        List<String[]> lines = new ArrayList<>();
         for (ReportRow row : rows) {
-            System.out.printf(format, row.name(), row.count(),
-                              row.totalAmount().toPlainString(),
-                              row.approvedAmount().toPlainString());
+            lines.add(new String[] {
+                row.name(),
+                String.valueOf(row.count()),
+                row.totalAmount().toPlainString(),
+                row.approvedAmount().toPlainString()
+            });
         }
+
+        System.out.println(TableFormatter.format(
+            new String[] {type.columnTitle(), "Count", "Total Amount", "Total Approved"},
+            lines,
+            new boolean[] {false, true, true, true},
+            new int[] {0, 0, 0, 0}
+        ));
     }
 
     // Asks until the answer is 0, 1 or 2. Returns null if input ends.
