@@ -1,7 +1,6 @@
 """FR-E3, FR-A4, FR-S2: Editing an expense, cases TC-EMP-035 to TC-EMP-039 and 041.
 These tests use a real temporary SQLite database (schema.sql) and the real
 menu and service code.  Nothing is mocked except the keyboard input.
-The mocked-database tests for the same feature are in tests/unit/test_edit_expense.py.
 """
 
 import sqlite3
