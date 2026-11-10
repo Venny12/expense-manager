@@ -175,3 +175,62 @@ def test_role_is_taken_from_the_database_not_from_the_login_dictionary():
     with pytest.raises(AuthorizationError):
         edit(db)
     assert db.updates == []
+
+
+# TC-EMP-040  Invalid new value (service level)
+
+@pytest.mark.negative
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"amount": "-5"}, {"amount": "0"}, {"amount": "abc"}, {"amount": ""},
+        {"amount": "10000.01"}, {"amount": "5.001"},
+        {"description": ""}, {"description": "   "}, {"description": "x" * 201},
+        {"category": 99}, {"category": "abc"},
+        {"expense_date": "2026-11-13"},  # future date
+        {"expense_date": "2026-08-11"},  # 91 days ago
+        {"expense_date": "2026-02-30"},  # invalid date
+        {"expense_date": "abc"},         # text date invalid
+    ],
+    
+    ids=["amount-negative", "amount-zero", "amount-text", "amount-empty",
+         "amount-over-max", "amount-3-decimals",
+         "description-empty", "description-spaces", "description-201",
+         "category-unknown", "category-text",
+         "date-future", "date-91-days", "date-not-real", "date-text"],
+)
+def test_edit_with_an_invalid_value_writes_nothing(overrides):
+    # TC-EMP-040 | VR-01 to VR-04 - a bad value is refused and nothing is saved.
+    db = FakeDb(row=expense())
+    with pytest.raises(ValidationError):
+        edit(db, **overrides)
+    assert db.updates == []
+
+@pytest.mark.boundary
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"amount": "0.01"}, {"amount": "10000.00"},
+        {"description": "x"}, {"description": "x" * 200},
+        {"category": 1}, {"category": 2},
+        {"expense_date": "2026-11-10"},   # today
+        {"expense_date": "2026-08-12"},   # exactly 90 days ago
+    ],
+    
+    ids=["amount-min", "amount-max", "description-1", "description-200",
+         "category-first", "category-last", "date-today", "date-90-days"],
+)
+
+def test_edit_with_a_value_at_the_limit_is_saved(overrides):
+    # TC-EMP-035 | VR-01 to VR-04 - values exactly at the edge are accepted.
+    db = FakeDb(row=expense())
+    edit(db, **overrides)
+    assert len(db.updates) == 1
+
+@pytest.mark.boundary
+def test_edit_trims_spaces_around_the_description():
+    # TC-EMP-035 | VR-02 - leading and trailing spaces are not saved.
+    db = FakeDb(row=expense())
+    edit(db, description="  Taxi  ")
+    assert db.updates[0][1][2] == "Taxi"
+
