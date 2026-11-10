@@ -101,8 +101,8 @@ def test_query_4_finds_bad_decided_rows(seeded_db, change):
 @pytest.mark.integration
 @pytest.mark.negative
 @pytest.mark.parametrize(
-    "bad_date", ["14/08/2026", "Aug 14", "2026-02-30"],
-    ids=["slashes", "text", "impossible_date"],
+    "bad_date", ["14/08/2026", "Aug 14", "2026-02-30", "2026-13-01", "2026-04-32"],
+    ids=["slashes", "text", "impossible_date", "impossible_month", "impossible_day"],
 )
 def test_query_5_finds_bad_review_date(seeded_db, bad_date):
     # validation query 5 detects bad review dates.
