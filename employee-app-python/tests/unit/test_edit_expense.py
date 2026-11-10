@@ -234,3 +234,119 @@ def test_edit_trims_spaces_around_the_description():
     edit(db, description="  Taxi  ")
     assert db.updates[0][1][2] == "Taxi"
 
+
+# Menu: TC-EMP-040 (re-asking) and TC-EMP-041 (Enter keeps the value)
+
+CURRENT = expense()
+
+def make_factory():
+    # A connection factory that works with 'with factory() as connection:'.
+    factory = MagicMock()
+    factory.return_value.__enter__.return_value = MagicMock()
+    factory.return_value.__exit__.return_value = False
+    return factory
+
+def run_edit(monkeypatch, answers, update=None, find=None, factory=None):
+    # Run menu.handle_edit with typed `answers`; return (prompts, update mock, factory).
+    remaining = iter(answers)
+    prompts = []
+    def fake_input(prompt=""):
+        prompts.append(prompt)
+        return next(remaining)
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    factory = factory or make_factory()
+    update = update or MagicMock()
+    with patch.object(menu.services, "get_own_pending_expense",
+                      side_effect=find, return_value=CURRENT), \
+         patch.object(menu.services, "get_categories", return_value=CATEGORIES), \
+         patch.object(menu.services, "update_expense", update):
+        menu.handle_edit(factory, EMPLOYEE)
+    return prompts, update, factory
+
+def saved_values(update):
+    # (expense id, amount, category, description, date) that the menu saved.
+    return update.call_args.args[2:7]
+
+def test_enter_keeps_the_current_values_when_editing(monkeypatch, capsys):
+    # TC-EMP-041 | FR-E3 - Enter keeps amount, category and date; only the description changes.
+    _prompts, update, _factory = run_edit(monkeypatch, ["101", "", "", "Airport taxi", ""])
+    assert saved_values(update) == (101, 25.5, 1, "Airport taxi", "2026-11-01")
+    assert "Expense 101 updated." in capsys.readouterr().out
+
+@pytest.mark.boundary
+def test_pressing_enter_everywhere_saves_the_unchanged_values(monkeypatch):
+    # TC-EMP-041 | FR-E3 - Enter at every prompt keeps every current value.
+    _prompts, update, _factory = run_edit(monkeypatch, ["101", "", "", "", ""])
+    assert saved_values(update) == (101, 25.5, 1, "Taxi to airport", "2026-11-01")
+
+
+def test_edit_prompts_show_the_current_values(monkeypatch, capsys):
+    # TC-EMP-041 | FR-E3 - each prompt shows what Enter will keep.
+    prompts, _update, _factory = run_edit(monkeypatch, ["101", "", "", "", ""])
+    assert prompts[1:] == [
+        "Amount [25.50]: ",
+        "Category number [1 - Travel]: ",
+        "Description [Taxi to airport]: ",
+        "Expense date [2026-11-01]: ",
+    ]
+    output = capsys.readouterr().out
+    assert "Press Enter to keep the current value." in output
+    assert "1. Travel" in output and "2. Meals" in output
+
+@pytest.mark.negative
+def test_edit_asks_again_after_an_invalid_amount(monkeypatch, capsys):
+    # TC-EMP-040 | VR-01 - bad amounts are refused; only the valid one is saved.
+    _prompts, update, _factory = run_edit(
+        monkeypatch, ["101", "-5", "abc", "30.00", "", "", ""]
+    )
+    assert capsys.readouterr().out.count("Amount must be greater than 0") == 2
+    update.assert_called_once()
+    assert saved_values(update)[1] == Decimal("30.00")
+
+@pytest.mark.negative
+def test_edit_asks_again_for_an_invalid_category(monkeypatch, capsys):
+    # TC-EMP-040 | VR-03 - a category not in the list is refused, then 2 is saved.
+    _prompts, update, _factory = run_edit(monkeypatch, ["101", "", "9", "x", "2", "", ""])
+    assert capsys.readouterr().out.count("Choose a category number from the list.") == 2
+    assert saved_values(update)[2] == 2
+
+@pytest.mark.negative
+def test_edit_asks_again_for_a_description_that_is_too_long(monkeypatch, capsys):
+    # TC-EMP-040 | VR-02 - 201 characters are refused, then a valid text is saved.
+    _prompts, update, _factory = run_edit(monkeypatch, ["101", "", "", "x" * 201, "Short note", ""])
+    assert capsys.readouterr().out.count("Description must contain") == 1
+    assert saved_values(update)[3] == "Short note"
+
+@pytest.mark.negative
+def test_edit_asks_again_for_an_invalid_date(monkeypatch, capsys):
+    # TC-EMP-040 | VR-04 - a date that is not real is refused, then a valid one saves.
+    _prompts, update, _factory = run_edit(monkeypatch, ["101", "", "", "", "2026-02-30", "abc", "2026-11-02"])
+    assert saved_values(update)[4] == "2026-11-02"
+    update.assert_called_once()
+
+@pytest.mark.negative
+def test_edit_asks_again_for_an_invalid_expense_id(monkeypatch, capsys):
+    # TC-EMP-039 | VR-08 - 0, -1 and text are refused before any lookup.
+    _prompts, update, _factory = run_edit(monkeypatch, ["0", "-1", "abc", "", "101", "", "", "", ""])
+    assert capsys.readouterr().out.count(EXPENSE_ID_RULE) == 4
+    assert saved_values(update)[0] == 101
+
+@pytest.mark.negative
+@pytest.mark.parametrize(
+    "error",
+    [NotFoundError("Expense not found."),
+     AuthorizationError("You can only change your own expenses."),
+     InvalidStateError("Expense is no longer pending.")],
+    ids=["not-found", "not-yours", "not-pending"],
+)
+
+def test_edit_stops_at_once_when_the_expense_cannot_be_edited(monkeypatch, error):
+    # TC-EMP-036 to 039 - no further prompts and nothing saved; the error goes up
+    # to the menu loop, which prints it.
+    update = MagicMock()
+    with pytest.raises(type(error), match=str(error)):
+        # only the ID is typed: asking for anything else would fail the test
+        run_edit(monkeypatch, ["101"], update=update, find=error)
+    update.assert_not_called()
+    
