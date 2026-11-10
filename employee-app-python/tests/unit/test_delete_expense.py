@@ -159,3 +159,84 @@ def test_role_is_taken_from_the_database_not_from_the_login_dictionary():
     with pytest.raises(AuthorizationError):
         delete(db)
     assert db.deletes == []
+    
+
+# Menu: TC-EMP-042 (confirm) and TC-EMP-047 (anything but y cancels)
+
+CURRENT = expense()
+
+def make_factory():
+    # A connection factory that works with 'with factory() as connection:'.
+    factory = MagicMock()
+    factory.return_value.__enter__.return_value = MagicMock()
+    factory.return_value.__exit__.return_value = False
+    return factory
+
+def run_delete(monkeypatch, answers, find=None):
+    # Run menu.handle_delete with typed 'answers'; return (prompts, delete mock).
+    remaining = iter(answers)
+    prompts = []
+
+    def fake_input(prompt=""):
+        prompts.append(prompt)
+        return next(remaining)
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    delete_mock = MagicMock()
+    with patch.object(menu.services, "get_own_pending_expense",
+                      side_effect=find, return_value=CURRENT), \
+         patch.object(menu.services, "delete_expense", delete_mock):
+        menu.handle_delete(make_factory(), EMPLOYEE)
+    return prompts, delete_mock
+
+
+@pytest.mark.parametrize("answer", ["y", "Y", " y "], ids=["y", "capital-Y", "y-with-spaces"])
+def test_delete_happens_when_the_answer_is_y(monkeypatch, capsys, answer):
+    # TC-EMP-042 | FR-E4 - 'y' or 'Y' (spaces are trimmed) deletes the expense.
+    _prompts, delete_mock = run_delete(monkeypatch, ["101", answer])
+
+    delete_mock.assert_called_once()
+    assert delete_mock.call_args.args[1:] == (EMPLOYEE, 101)
+    assert "Expense 101 deleted." in capsys.readouterr().out
+
+def test_delete_shows_the_expense_before_asking_for_confirmation(monkeypatch, capsys):
+    # TC-EMP-042 | FR-E4 - the employee sees which expense will be deleted.
+    prompts, _delete_mock = run_delete(monkeypatch, ["101", "n"])
+    assert "Expense 101: Travel, 25.50, Taxi to airport" in capsys.readouterr().out
+    assert prompts == ["Expense ID to delete: ", "Delete this expense? (y/n): "]
+
+@pytest.mark.negative
+@pytest.mark.parametrize("answer",
+    ["n", "N", "", " ", "yes", "YES", "no", "x", "0", "1", "yy"],
+    ids=["n", "capital-N", "enter", "spaces", "yes", "capital-YES", "no",
+         "letter", "zero", "one", "double-y"],
+)
+def test_delete_is_cancelled_unless_the_answer_is_y(monkeypatch, capsys, answer):
+    # TC-EMP-047 | FR-E4 - only 'y' or 'Y' confirms; every other answer cancels.
+    _prompts, delete_mock = run_delete(monkeypatch, ["101", answer])
+    delete_mock.assert_not_called()
+    output = capsys.readouterr().out
+    assert "Deletion cancelled." in output
+    assert "deleted." not in output
+
+@pytest.mark.negative
+def test_delete_asks_again_for_an_invalid_expense_id(monkeypatch, capsys):
+    # TC-EMP-046 | VR-08 - 0, -1, text and empty are refused before any lookup.
+    _prompts, delete_mock = run_delete(monkeypatch, ["0", "-1", "abc", "", "101", "y"])
+    assert capsys.readouterr().out.count(EXPENSE_ID_RULE) == 4
+    assert delete_mock.call_args.args[2] == 101
+
+
+@pytest.mark.negative
+@pytest.mark.parametrize("error",
+    [NotFoundError("Expense not found."),
+     AuthorizationError("You can only change your own expenses."),
+     InvalidStateError("Expense is no longer pending.")],
+    ids=["not-found", "not-yours", "not-pending"],
+)
+def test_delete_stops_at_once_when_the_expense_cannot_be_deleted(monkeypatch, error):
+    # TC-EMP-043 to 046 - no confirmation is asked and nothing is deleted; the
+    # error goes up to the menu loop, which prints it.
+    with pytest.raises(type(error), match=str(error)):
+        # only the ID is typed: asking for a confirmation would fail the test
+        run_delete(monkeypatch, ["101"], find=error)
