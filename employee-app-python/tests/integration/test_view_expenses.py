@@ -149,3 +149,64 @@ def test_manager_cannot_view_employee_expenses(view_app):
     # TC-EMP-030 | FR-A4 - the role is read from the database; a manager is refused.
     with pytest.raises(AuthorizationError):
         view(view_app, view_app.manager)
+
+
+# TC-EMP-031, 032, 033  View pending / approved / denied
+
+STATUS_CASES = [
+    # choice, status, expected expense ids (attribute names), first row details
+    ("1", "pending", ["a_pending_new", "a_pending_old"],
+     {"category": "Meals", "amount": 9.99, "expense_date": "2026-11-08"}),
+    ("2", "approved", ["a_approved"],
+     {"category": "Meals", "amount": 12.0, "expense_date": "2026-11-06"}),
+    ("3", "denied", ["a_denied"],
+     {"category": "Lodging", "amount": 80.0, "expense_date": "2026-10-20"}),
+]
+STATUS_IDS = ["pending", "approved", "denied"]
+
+@pytest.mark.parametrize("choice, status, expected, details", STATUS_CASES, ids=STATUS_IDS)
+def test_view_by_status_returns_only_that_status_with_details(
+    view_app, choice, status, expected, details
+):
+    # TC-EMP-031, 032, 033 | FR-E2 - only the chosen status, with accurate details.
+    rows = view(view_app, view_app.a, status)
+
+    assert [row["id"] for row in rows] == [getattr(view_app.ids, name) for name in expected]
+    assert {row["status"] for row in rows} == {status}
+    first = rows[0]
+    for field, value in details.items():
+        assert first[field] == value
+
+
+@pytest.mark.parametrize("choice, status, expected, details", STATUS_CASES, ids=STATUS_IDS)
+def test_menu_filter_prints_details_and_status(
+    view_app, monkeypatch, capsys, choice, status, expected, details
+):
+    # TC-EMP-031, 032, 033 | FR-E2 - the printed row shows ID, date, category,
+    # amount with 2 decimals, and status.
+    output = view_on_screen(view_app, monkeypatch, capsys, view_app.a, choice)
+
+    first_id = getattr(view_app.ids, expected[0])
+    line = next(text for text in output.splitlines()
+                if text.split() and text.split()[0] == str(first_id))
+    for shown in (details["expense_date"], details["category"],
+                  f"{details['amount']:.2f}", status):
+        assert shown in line
+    assert listed_ids(output) == [getattr(view_app.ids, name) for name in expected]
+
+
+@pytest.mark.parametrize("status", ["pending", "approved", "denied"])
+def test_status_filter_never_shows_another_employees_expenses(view_app, status):
+    # TC-EMP-031, 032, 033 | FR-A4 - B's pending and approved rows stay hidden.
+    ids = view_app.ids
+    shown = {row["id"] for row in view(view_app, view_app.a, status)}
+    assert not shown & {ids.b_pending, ids.b_approved}
+
+
+@pytest.mark.negative
+@pytest.mark.parametrize("status", ["paid", "PENDING", "", "approved' OR '1'='1"])
+def test_view_with_unknown_status_is_refused(view_app, status):
+    # TC-EMP-031 | FR-E2 - only pending, approved or denied are accepted;
+    # text that looks like SQL is refused, not run.
+    with pytest.raises(ValidationError):
+        view(view_app, view_app.a, status)
