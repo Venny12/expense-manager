@@ -110,3 +110,68 @@ def test_edit_logs_success_without_the_description(caplog):
         edit(db, description="Secret client dinner")
     assert "Expense edited: expense_id=101 user_id=3" in caplog.text
     assert "Secret client dinner" not in caplog.text
+
+
+# TC-EMP-036 to TC-EMP-039  Edits that must be refused
+
+@pytest.mark.negative
+def test_edit_another_employees_expense_is_refused():
+    # TC-EMP-036 | FR-E3, FR-A4 - nothing is written for someone else's expense.
+    # Arrange
+    db = FakeDb(row=expense(user_id=4))
+    # Act
+    with pytest.raises(AuthorizationError, match="only change your own"):
+        edit(db)
+    # Assert
+    assert db.updates == []
+
+@pytest.mark.negative
+@pytest.mark.parametrize("status", ["approved", "denied"])
+def test_edit_decided_expense_is_refused(status):
+    # TC-EMP-037, 038 | FR-E3, FR-S2 - approved and denied expenses are final.
+    db = FakeDb(row=expense(status=status))
+    with pytest.raises(InvalidStateError, match="no longer pending"):
+        edit(db)
+    assert db.updates == []
+
+@pytest.mark.negative
+def test_edit_expense_without_an_approval_row_is_refused():
+    # TC-EMP-037 | FR-S1 - a broken record (no approval row) is not editable.
+    db = FakeDb(row=expense(status=None))
+    with pytest.raises(InvalidStateError):
+        edit(db)
+    assert db.updates == []
+
+@pytest.mark.negative
+def test_edit_missing_expense_reports_not_found():
+    # TC-EMP-039 | FR-E3 - an unknown ID gives 'not found' and writes nothing.
+    db = FakeDb(row=None)
+    with pytest.raises(NotFoundError, match="Expense not found."):
+        edit(db)
+    assert db.updates == []
+
+@pytest.mark.negative
+def test_ownership_is_checked_before_the_new_values():
+    # TC-EMP-036 | FR-A4 - someone else's expense gives an authorization error
+    # even when the new values are also invalid (amount is negative).
+    db = FakeDb(row=expense(user_id=4))
+    with pytest.raises(AuthorizationError):
+        edit(db, amount="-5")
+
+@pytest.mark.negative
+def test_manager_cannot_edit_an_expense():
+    # TC-EMP-036 | FR-A4 - a manager is refused before the database is touched.
+    db = FakeDb(row=expense())
+    with pytest.raises(AuthorizationError, match="Only employees"):
+        edit(db, user=MANAGER)
+    # checks whether the mocked execute() method was called zero times.
+    db.connection.execute.assert_not_called()
+
+@pytest.mark.negative
+def test_role_is_taken_from_the_database_not_from_the_login_dictionary():
+    # FR-A4 - a user dict that claims 'employee' is refused if the database says
+    # the account is a manager.
+    db = FakeDb(row=expense(), account_role="manager")
+    with pytest.raises(AuthorizationError):
+        edit(db)
+    assert db.updates == []
