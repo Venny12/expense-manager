@@ -99,3 +99,63 @@ def test_delete_logs_who_deleted_which_expense(caplog):
         delete(db)
     assert "Expense deleted: expense_id=101 user_id=3" in caplog.text
     assert "Taxi to airport" not in caplog.text
+    
+
+# TC-EMP-043 to TC-EMP-046  Deletes that must be refused
+
+@pytest.mark.negative
+def test_delete_another_employees_expense_is_refused():
+    # TC-EMP-043 | FR-E4, FR-A4 - nothing is deleted for someone else's expense.
+    db = FakeDb(row=expense(user_id=4))
+    with pytest.raises(AuthorizationError, match="only change your own"):
+        delete(db)
+    assert db.deletes == []
+
+@pytest.mark.negative
+@pytest.mark.parametrize("status", ["approved", "denied"])
+def test_delete_decided_expense_is_refused(status):
+    # TC-EMP-044, 045 | FR-E4, FR-S2 - only pending expenses can be deleted.
+    db = FakeDb(row=expense(status=status))
+    with pytest.raises(InvalidStateError, match="no longer pending"):
+        delete(db)
+    assert db.deletes == []
+
+@pytest.mark.negative
+def test_delete_expense_without_an_approval_row_is_refused():
+    # TC-EMP-044 | FR-S1 - a broken record (no approval row) is not deleted.
+    db = FakeDb(row=expense(status=None))
+    with pytest.raises(InvalidStateError):
+        delete(db)
+    assert db.deletes == []
+
+@pytest.mark.negative
+def test_delete_missing_expense_reports_not_found():
+    # TC-EMP-046 | FR-E4 - an unknown ID gives 'not found' and deletes nothing.
+    db = FakeDb(row=None)
+    with pytest.raises(NotFoundError, match="Expense not found."):
+        delete(db)
+    assert db.deletes == []
+
+@pytest.mark.negative
+def test_ownership_is_checked_before_the_status():
+    # TC-EMP-043 | FR-A4 - someone else's decided expense gives an authorization error
+    # nothing about its status is revealed.
+    db = FakeDb(row=expense(user_id=4, status="approved"))
+    with pytest.raises(AuthorizationError):
+        delete(db)
+
+@pytest.mark.negative
+def test_manager_cannot_delete_an_expense():
+    # TC-EMP-043 | FR-A4 - a manager is refused before the database is touched.
+    db = FakeDb(row=expense())
+    with pytest.raises(AuthorizationError, match="Only employees"):
+        delete(db, user=MANAGER)
+    db.connection.execute.assert_not_called()
+
+@pytest.mark.negative
+def test_role_is_taken_from_the_database_not_from_the_login_dictionary():
+    # FR-A4 - a user dict that claims 'employee' is refused if the database says the account is manager.
+    db = FakeDb(row=expense(), account_role="manager")
+    with pytest.raises(AuthorizationError):
+        delete(db)
+    assert db.deletes == []
