@@ -58,3 +58,44 @@ class FakeDb:
 def delete(db, user=EMPLOYEE):
     services.delete_expense(db.connection, user, 101)
 
+
+# TC-EMP-042  Delete own pending expense
+
+def test_delete_own_pending_expense_removes_the_approval_row_then_the_expense():
+    # TC-EMP-042 | FR-E4 - both rows are deleted, the approval first (it points at the expense).
+    # Arrange
+    db = FakeDb(row=expense())
+    # Act
+    delete(db)
+    # Assert
+    assert [sql.split(" where")[0] for sql, _ in db.deletes] == [
+        "delete from approvals",
+        "delete from expenses",
+    ]
+    assert db.deletes[0][1] == (101,)
+    assert db.deletes[1][1] == (101, EMPLOYEE["id"])
+
+def test_delete_only_applies_to_a_pending_approval_and_the_owners_expense():
+    # TC-EMP-042 | FR-S2, FR-A4 - the DELETE statements themselves are limited,
+    # the approval must be pending and the expense must belong to the user.
+    db = FakeDb(row=expense())
+    delete(db)
+    approval_sql, expense_sql = db.deletes[0][0], db.deletes[1][0]
+    assert "status = 'pending'" in approval_sql
+    assert "user_id = ?" in expense_sql
+
+def test_delete_is_one_transaction():
+    # TC-EMP-042 | FR-E4 - both DELETEs run inside one 'with connection:' block,
+    # so both rows go together or neither does.
+    db = FakeDb(row=expense())
+    delete(db)
+    db.connection.__enter__.assert_called_once()
+    db.connection.__exit__.assert_called_once()
+
+def test_delete_logs_who_deleted_which_expense(caplog):
+    # FR-S3 - the log records the expense and user ids, not the description.
+    db = FakeDb(row=expense())
+    with caplog.at_level(logging.INFO, logger="employee_app.services"):
+        delete(db)
+    assert "Expense deleted: expense_id=101 user_id=3" in caplog.text
+    assert "Taxi to airport" not in caplog.text
