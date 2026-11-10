@@ -66,3 +66,47 @@ class FakeDb:
 
 def edit(db, user=EMPLOYEE, amount="30.00", category=2, description="New taxi", expense_date="2026-11-02"):
     services.update_expense(db.connection, user, 101, amount, category, description, expense_date, today=TODAY)
+
+
+# TC-EMP-035  Edit own pending expense
+
+def test_edit_own_pending_expense_sends_the_new_values():
+    # TC-EMP-035 | FR-E3 - one UPDATE with the new values for this user's expense.
+    db = FakeDb(row=expense())
+    edit(db)
+    (sql, parameters), = db.updates
+    assert parameters == (30.0, 2, "New taxi", "2026-11-02", 101, EMPLOYEE["id"])
+    assert "where id = ? and user_id = ?" in sql
+
+
+def test_edit_update_only_applies_while_the_approval_is_pending():
+    # TC-EMP-035 | FR-S2 - the UPDATE itself only applies to a pending expense.
+    db = FakeDb(row=expense())
+    edit(db)
+    sql, _parameters = db.updates[0]
+    assert "status = 'pending'" in sql
+
+
+def test_edit_never_changes_the_approval_status():
+    # TC-EMP-035 | FR-E3 - the status stays pending: no approvals row is written.
+    db = FakeDb(row=expense())
+    edit(db)
+    assert all(text.startswith("update expenses") for text, _ in db.updates)
+    assert len(db.updates) == 1
+
+
+def test_edit_is_saved_in_a_transaction():
+    # TC-EMP-035 | FR-E3 - the UPDATE runs inside 'with connection:' (commit).
+    db = FakeDb(row=expense())
+    edit(db)
+    db.connection.__enter__.assert_called_once()
+    db.connection.__exit__.assert_called_once()
+
+
+def test_edit_logs_success_without_the_description(caplog):
+    # FR-S3 - the log says who edited what, but not the text description.
+    db = FakeDb(row=expense())
+    with caplog.at_level(logging.INFO, logger="employee_app.services"):
+        edit(db, description="Secret client dinner")
+    assert "Expense edited: expense_id=101 user_id=3" in caplog.text
+    assert "Secret client dinner" not in caplog.text
