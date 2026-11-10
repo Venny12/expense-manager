@@ -210,3 +210,32 @@ def test_view_with_unknown_status_is_refused(view_app, status):
     # text that looks like SQL is refused, not run.
     with pytest.raises(ValidationError):
         view(view_app, view_app.a, status)
+
+
+# TC-EMP-034  Employee has no expenses
+
+@pytest.mark.negative
+@pytest.mark.parametrize("choice", ["0", "1", "2", "3"], ids=["all", "pending", "approved", "denied"])
+def test_menu_says_no_expenses_found_for_employee_with_none(view_app, monkeypatch, capsys, choice):
+    # TC-EMP-034 | FR-E2 - the message is printed, no table, no crash.
+    output = view_on_screen(view_app, monkeypatch, capsys, view_app.c, choice)
+
+    assert "No expenses found." in output
+    assert "Category" not in output
+    assert listed_ids(output) == []
+
+@pytest.mark.negative
+def test_service_returns_an_empty_list_for_employee_with_no_expenses(view_app):
+    # TC-EMP-034 | FR-E2 - an empty list, not an error.
+    assert view(view_app, view_app.c) == []
+
+
+@pytest.mark.boundary
+@pytest.mark.parametrize("choice", ["2", "3"], ids=["approved", "denied"])
+def test_filter_with_no_matching_status_says_no_expenses_found(view_app, monkeypatch, capsys, choice):
+    # TC-EMP-034 | FR-E2 - Employee D has only a pending expense;
+    # the other filters find nothing and the message is shown (no crash).
+    output = view_on_screen(view_app, monkeypatch, capsys, view_app.d, choice)
+    assert "No expenses found." in output
+    assert listed_ids(output) == []
+    
