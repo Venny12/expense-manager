@@ -8,6 +8,7 @@ import java.io.Console;
 import java.util.function.Function;
 import java.util.List;
 import java.util.ArrayList;
+
 import com.revature.expensemanager.dao.ExpenseDao;
 import com.revature.expensemanager.services.ExpenseService;
 import com.revature.expensemanager.dao.ReportDao;
@@ -100,7 +101,12 @@ public class Menu {
                 }
             } catch (ExpenseManagerException error) {
                 System.out.println(error.getMessage());
+
             } catch (Exception error) {
+                // Ctrl+C inside an option closes the app (handled in Main).
+                if (Main.isConsoleInterrupt(error)) {
+                    throw error;
+                }
                 LOGGER.log(
                     Level.SEVERE,
                     "Unexpected error in menu option " + choice,
