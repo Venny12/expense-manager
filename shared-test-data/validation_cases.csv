@@ -1,0 +1,35 @@
+field,input,expected
+expense_id,1,true
+expense_id,42,true
+expense_id,007,true
+expense_id," 5 ",true
+expense_id,2147483647,true
+expense_id,0,false
+expense_id,-1,false
+expense_id,1.5,false
+expense_id,abc,false
+expense_id,1a,false
+expense_id,"",false
+expense_id," ",false
+menu_choice,0,true
+menu_choice,1,true
+menu_choice,2,true
+menu_choice,3,true
+menu_choice,01,true
+menu_choice," 2 ",true
+menu_choice,6,false
+menu_choice,9,false
+menu_choice,99999999999,false
+menu_choice,-1,false
+menu_choice,1.5,false
+menu_choice,abc,false
+menu_choice,"",false
+menu_choice," ",false
+login,employee_test|demo123,true
+login,wrong|wrong,true
+login,|demo123,false
+login,employee_test|,false
+login,|,false
+login," | ",false
+login," |demo123",false
+login,employee_test| ,false
