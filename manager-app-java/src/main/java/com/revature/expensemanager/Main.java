@@ -10,8 +10,10 @@ import java.util.Arrays;
 import java.util.logging.FileHandler;
 import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
-
-import java.util.logging.Level;
+import java.io.IOError;
+import java.io.UncheckedIOException;
+import java.util.function.Supplier;
+//import java.util.logging.Level;
 
 import com.revature.expensemanager.db.Database;
 import com.revature.expensemanager.exceptions.AuthenticationException;
@@ -19,7 +21,7 @@ import com.revature.expensemanager.exceptions.AuthorizationException;
 import com.revature.expensemanager.exceptions.ExpenseManagerException;
 import com.revature.expensemanager.exceptions.ValidationException;
 import com.revature.expensemanager.services.AuthenticationService;
-import com.revature.expensemanager.validation.InputValidator;
+//import com.revature.expensemanager.validation.InputValidator;
 
 /** Starts the Manager App and handles login prompts. */
 public class Main {
@@ -35,6 +37,12 @@ public class Main {
         // Run the app from the manager-app-java folder.
         Path logFolder = Path.of("..", "logs").toAbsolutePath().normalize();
 
+        return run(System.console(), logFolder, Database::dbPath);
+    }
+
+    // The console, log folder and database path are parameters so that tests
+    // can supply their own. The real app passes the real ones from run().
+    static int run(Console console, Path logFolder, Supplier<String> databasePath) {
         try {
             Files.createDirectories(logFolder);
 
@@ -58,7 +66,7 @@ public class Main {
             return 1;
         }
 
-        Console console = System.console();
+        //Console console = System.console();
 
         if (console == null) {
             System.out.println(
@@ -68,7 +76,7 @@ public class Main {
         }
 
         try (
-            Connection connection = Database.connect(Database.dbPath())
+            Connection connection = Database.connect(databasePath.get())
         ) {
             AuthenticationService service =
                 new AuthenticationService(connection);
@@ -125,7 +133,14 @@ public class Main {
             );
             return 1;
 
-        } catch (Exception error) {
+        } catch (Exception | IOError error) {
+            // Ctrl+C at a prompt is not an error: close the app cleanly.
+            if (isConsoleInterrupt(error)) {
+                System.out.println();
+                System.out.println("Application closed.");
+                return 0;
+            }
+
             LOGGER.log(
                 java.util.logging.Level.SEVERE,
                 "Unexpected application error.",
@@ -134,5 +149,21 @@ public class Main {
             System.out.println("Unexpected error. See log.");
             return 1;
         }
+    }
+
+    // True when the console was interrupted (Ctrl+C) while waiting for input.
+    // The console reports this with an IOError, an UncheckedIOException or
+    // its own user-interrupt exception, so the exception chain is checked.
+    static boolean isConsoleInterrupt(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof IOError
+                    || cause instanceof UncheckedIOException
+                    || cause.getClass().getSimpleName()
+                        .equals("UserInterruptException")) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
