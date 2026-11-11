@@ -28,27 +28,19 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/**
- * FR-A4, FR-S4, VR-09: menu choices and application errors, cases
- * TC-MGR-038 and TC-MGR-040 to TC-MGR-045 (the Java counterparts of
- * TC-EMP-051 to TC-EMP-057).
- *
- * The real Main, AuthenticationService and Menu run against a real temporary
- * SQLite database (schema.sql). Only the keyboard (a scripted Console), the
- * screen and the log folder are replaced. Every test also checks that no
- * stack trace reaches the screen.
- *
- * Ctrl+C is simulated: when the console is interrupted it throws an
- * exception instead of returning a line, so the scripted keyboard throws an
- * UncheckedIOException or an IOError at the chosen prompt (TC-MGR-044).
+/*
+FR-A4, FR-S4, VR-09: menu choices and application errors, cases TC-MGR-038 and TC-MGR-040 to TC-MGR-045
+
+ * The real Main, AuthenticationService and Menu run against a real temporary SQLite database (schema.sql).
+ * Only the keyboard (a scripted Console), the screen and the log folder are replaced. 
+ * Every test also checks that no stack trace reaches the screen.
  */
+
 @Tag("integration")
 class ErrorHandlingIntegrationTest {
-
     private static final String MANAGER_PASSWORD = "ManagerPass123!";
     private static final String MENU_RULE = "Please enter a number from the menu.";
     private static final String UNEXPECTED = "Unexpected error. See log.";
-
     @TempDir
     Path tempFolder;
 
@@ -59,10 +51,9 @@ class ErrorHandlingIntegrationTest {
 
     private Handler[] originalHandlers;
     private boolean originalUseParentHandlers;
-
-    /**
-     * A scripted keyboard. readLine answers come from one list, readPassword
-     * answers from another. The prompts the app showed are recorded. If
+    /*
+     * A scripted keyboard. readLine answers come from one list, readPassword answers from another. 
+     * The prompts the app showed are recorded. If
      * failAtPrompt is set, asking that prompt throws the given failure
      * (an unexpected exception, or a Ctrl+C interrupt).
      */
@@ -176,14 +167,12 @@ class ErrorHandlingIntegrationTest {
                     schema = candidate;
                     break;
                 }
-
                 folder = folder.getParent();
             }
 
             assertNotNull(schema, "Could not find sql/schema.sql");
 
-            String sql = Files.readString(schema, StandardCharsets.UTF_8)
-                .replace("﻿", "");
+            String sql = Files.readString(schema, StandardCharsets.UTF_8).replace("", "");
 
             try (var statement = connection.createStatement()) {
                 for (String part : sql.split(";")) {
@@ -191,7 +180,6 @@ class ErrorHandlingIntegrationTest {
                         statement.execute(part);
                     }
                 }
-
                 statement.execute("""
                     INSERT INTO users (id, username, password, role, full_name)
                     VALUES
@@ -266,7 +254,6 @@ class ErrorHandlingIntegrationTest {
     }
 
     // TC-MGR-038  Missing database file
-
     @DisplayName("TC-MGR-038 / FR-S4: missing database file - friendly message, no stack trace, exit code 1")
     @Test
     void missingDatabaseFileGivesFriendlyMessage() {
@@ -289,7 +276,6 @@ class ErrorHandlingIntegrationTest {
     }
 
     // TC-MGR-040  Invalid main-menu choice
-
     @DisplayName("TC-MGR-040 / VR-09: invalid menu choices show the error and the menu again, 0 exits normally")
     @Test
     void invalidMenuChoicesShowErrorAndMenuAgain() throws Exception {
@@ -313,7 +299,6 @@ class ErrorHandlingIntegrationTest {
     }
 
     // TC-MGR-041  Error in one menu option does not end the session
-
     @DisplayName("TC-MGR-041 / FR-S4: a missing expense ID in Review does not end the session")
     @Test
     void errorInOneMenuOptionDoesNotEndTheSession() {
@@ -336,7 +321,6 @@ class ErrorHandlingIntegrationTest {
     }
 
     // TC-MGR-042  Unexpected error inside a menu option
-
     @DisplayName("TC-MGR-042 / FR-S4: unexpected error in a menu option is logged and the menu returns")
     @Test
     void unexpectedErrorInAMenuOptionIsLoggedAndMenuReturns() throws Exception {
@@ -358,7 +342,6 @@ class ErrorHandlingIntegrationTest {
     }
 
     // TC-MGR-043  Unexpected error while the application runs
-
     @DisplayName("TC-MGR-043 / FR-S4: unexpected error at login is logged, exit code 1")
     @Test
     void unexpectedErrorWhileRunningIsLoggedWithExitCode1() throws Exception {
@@ -376,7 +359,6 @@ class ErrorHandlingIntegrationTest {
     }
 
     // TC-MGR-044  Ctrl+C ends the app cleanly
-
     private static Throwable ctrlC() {
         return new UncheckedIOException(new IOException("interrupted"));
     }
@@ -448,7 +430,6 @@ class ErrorHandlingIntegrationTest {
     }
 
     // TC-MGR-045  Application log cannot be opened
-
     @DisplayName("TC-MGR-045 / FR-S4: log folder that cannot be created - message, no login prompt, exit code 1")
     @Test
     void logFolderThatCannotBeCreatedStopsBeforeLogin() throws Exception {
