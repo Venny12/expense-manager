@@ -6,8 +6,8 @@ This log records defects identified during application development, before the f
 
 | ID | Date Found | App | Summary | Severity / Priority | Found By | Reverified By | Status | Fix Reference |
 |---|---|---|---|---|---|---|---|---|
-| DFT-01 | 2026-11-01 | Java Manager App | Menu required Enter to be pressed twice after login due to a Scanner input issue. | Medium | Vennela | Vennela | Resolved | Commit `e0332cd` |
-| DFT-02 | 2026-11-04 | Java Manager App | Error creating formatted tables due to missing dependencies. | Medium | Vennela | Vennela/Shaqayeq | Resolved | Commit `2217588` (PR #22) |
+| DFT-01 | 2026-11-01 | Java Manager App | Menu required Enter to be pressed twice after login due to a Scanner input issue. | High / Medium Priority | Vennela | Vennela | Resolved | Commit `e0332cd` |
+| DFT-02 | 2026-11-04 | Java Manager App | Error creating formatted tables due to missing dependencies. | Medium / Low Priority | Vennela | Vennela/Shaqayeq | Resolved | Commit `2217588` (PR #22) |
 | DFT-03 | 2026-11-03 | Java Manager App | Approve/deny prompt appeared before checking whether an expense was still pending. | Medium / High Priority | Vennela | Vennela | Resolved | Commit `f537845` (PR #20) |
 | DFT-04 | 2026-11-11 | Java Manager App | Pressing Ctrl+C displayed "Unexpected error. See log." and recorded a SEVERE error. | Low / Medium Priority | Vennela | Vennela | Resolved | Commit `2826d91` (PR #46) |
 
