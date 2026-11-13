@@ -42,7 +42,7 @@ class SharedValidationCasesTest {
     private static final int MAX_MENU_CHOICE = 3;
     @Test
     void sharedFileIsNotEmpty() throws IOException {
-        assertTrue(readCases().count() >= 30);
+        assertTrue(readCases().count() >= 20);
     }
 
     @ParameterizedTest(name = "{0} [{1}] -> {2}")

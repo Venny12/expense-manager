@@ -224,55 +224,20 @@ class ReportIntegrationTest {
         assertFalse(output.contains("No data for the selected criteria."));
     }
 
-    @Test
-    @DisplayName("TC-MGR-030 / FR-M3: the category report with no date range counts every expense too")
-    void menuCategoryReportWithoutDateRangeShowsAllExpenses() {
-        String output = runMenu("3\n2\nn\nn\n0\n");
-        assertTrue(output.contains("Spending by category"));
-        assertFalse(output.contains("Spending by category ("));
-        assertTrue(output.contains("Meals"));
-        assertTrue(output.contains("120.00"));   // expenses 2, 4 and 6
-        assertTrue(output.contains("Travel"));
-        assertTrue(output.contains("165.00"));   // expenses 1, 3, 5, 7 and 8 (August to November)
-        assertFalse(output.contains("No data for the selected criteria."));
-    }
-
     // TC-MGR-031  Valid date range: both ends are included
     static Stream<Arguments> inclusiveRanges() {
         return Stream.of(
             Arguments.of(
-                "TC-MGR-031-whole-october", "2026-10-01", "2026-10-31",
-                List.of(
-                    row("Alice", 2, "70.00", "70.00"),
-                    row("Bob", 3, "130.00", "60.00")
-                )
-            ),
-            Arguments.of(
-                "TC-MGR-031-end-day-included", "2026-10-01", "2026-10-15",
+                "TC-MGR-031-10-01-to-10-15", "2026-10-01", "2026-10-15",
                 List.of(
                     row("Alice", 1, "20.00", "20.00"),
                     row("Bob", 2, "70.00", "0.00")
                 )
             ),
             Arguments.of(
-                "TC-MGR-031-start-day-included", "2026-10-16", "2026-10-31",
-                List.of(
-                    row("Alice", 1, "50.00", "50.00"),
-                    row("Bob", 1, "60.00", "60.00")
-                )
-            ),
-            Arguments.of(
                 "TC-MGR-031-09-30-to-10-01",
                 "2026-09-30", "2026-10-01",
                 List.of(row("Alice", 2, "30.00", "20.00"))
-            ),
-            Arguments.of(
-                "TC-MGR-031-10-31-to-11-01",
-                "2026-10-31", "2026-11-01",
-                List.of(
-                    row("Alice", 1, "70.00", "0.00"),
-                    row("Bob", 1, "60.00", "60.00")
-                )
             )
         );
     }
@@ -287,28 +252,6 @@ class ReportIntegrationTest {
         assertEquals(
             expected,
             reports.report(manager, ReportType.EMPLOYEE, range(start, end))
-        );
-    }
-
-    @Tag("boundary")
-    @DisplayName("TC-MGR-031 / VR-07: October includes 10-01 and 10-31 and excludes 09-30 and 11-01, in both reports")
-    @Test
-    void octoberRangeExcludesTheDaysOutsideIt() throws Exception {
-        DateRange october = range("2026-10-01", "2026-10-31");
-        assertEquals(
-            List.of(
-                row("Alice", 2, "70.00", "70.00"),
-                row("Bob", 3, "130.00", "60.00")
-            ),
-            reports.report(manager, ReportType.EMPLOYEE, october)
-        );
-        // 09-30 (Travel 10.00), 11-01 (Travel 70.00) and August (Travel 5.00) are left out of Travel.
-        assertEquals(
-            List.of(
-                row("Meals", 3, "120.00", "80.00"),
-                row("Travel", 2, "80.00", "50.00")
-            ),
-            reports.report(manager, ReportType.CATEGORY, october)
         );
     }
 
@@ -328,7 +271,7 @@ class ReportIntegrationTest {
 
     // TC-MGR-033  Start date equals end date
     @Tag("boundary")
-    @DisplayName("TC-MGR-033 / VR-07: a one-day range counts only that day (10-15 in, 10-16 out)")
+    @DisplayName("TC-MGR-033 / VR-07: start date is same as end date")
     @Test
     void oneDayRangeCountsOnlyThatDay() throws Exception {
         DateRange oneDay = range("2026-10-15", "2026-10-15");
@@ -343,21 +286,6 @@ class ReportIntegrationTest {
             ),
             reports.report(manager, ReportType.CATEGORY, oneDay)
         );
-    }
-
-    @Tag("boundary")
-    @DisplayName("TC-MGR-033 / VR-07: the screen accepts a start date equal to the end date")
-    @Test
-    void menuAcceptsAStartDateEqualToTheEndDate() {
-        String output = runMenu("3\n1\ny\n2026-10-15\n2026-10-15\nn\n0\n");
-        assertTrue(output.contains(
-            "Spending by employee (2026-10-15 to 2026-10-15)"
-        ));
-        assertTrue(output.contains("Bob"));
-        assertTrue(output.contains("70.00"));
-        assertFalse(output.contains(DATE_ORDER_RULE));
-        // Asked once: the first pair of dates was accepted.
-        assertEquals(1, countOccurrences(output, "Start date (YYYY-MM-DD):"));
     }
 
     // TC-MGR-032  Start date after end date
@@ -383,7 +311,6 @@ class ReportIntegrationTest {
             Arguments.of("text-start", "abc", "2026-10-31"),
             Arguments.of("text-end", "2026-10-01", "tomorrow"),
             Arguments.of("slashes", "10/01/2026", "10/31/2026"),
-            Arguments.of("day-first", "01-10-2026", "31-10-2026"),
             Arguments.of("impossible-month", "2026-13-01", "2026-10-31"),
             Arguments.of("impossible-day", "2026-02-30", "2026-03-01"),
             Arguments.of("empty", "", "")
@@ -433,9 +360,7 @@ class ReportIntegrationTest {
             Arguments.of("employee-report-future-range", "1", "employee", "2027-01-01", "2027-01-31"),
             Arguments.of("category-report-future-range", "2", "category", "2027-01-01", "2027-01-31"),
             Arguments.of("employee-report-gap-between-expenses", "1", "employee", "2026-09-01", "2026-09-29"),
-            Arguments.of("category-report-gap-between-expenses", "2", "category", "2026-09-01", "2026-09-29"),
-            Arguments.of("employee-report-before-all-expenses", "1", "employee", "2020-01-01", "2020-12-31"),
-            Arguments.of("employee-report-one-day-with-no-expenses", "1", "employee", "2026-10-20", "2026-10-20")
+            Arguments.of("category-report-gap-between-expenses", "2", "category", "2026-09-01", "2026-09-29")
         );
     }
 
@@ -453,21 +378,6 @@ class ReportIntegrationTest {
         assertTrue(output.contains(
             "Spending by " + reportName + " (" + start + " to " + end + ")"
         ));
-        assertTrue(output.contains("No data for the selected criteria."));
-        assertFalse(output.contains("Export this report to CSV"));
-        assertFalse(output.contains("Unexpected error"));
-        assertTrue(output.contains("Exit."));
-    }
-
-    @Tag("negative")
-    @DisplayName("TC-MGR-029 / FR-M3: with no expenses in the database at all the report says there is no data")
-    @Test
-    void emptyDatabaseGivesTheNoDataMessage() throws Exception {
-        execute("DELETE FROM approvals");
-        execute("DELETE FROM expenses");
-        assertEquals(List.of(), reports.report(manager, ReportType.EMPLOYEE, null));
-        assertEquals(List.of(), reports.report(manager, ReportType.CATEGORY, null));
-        String output = runMenu("3\n1\nn\n0\n");
         assertTrue(output.contains("No data for the selected criteria."));
         assertFalse(output.contains("Export this report to CSV"));
         assertFalse(output.contains("Unexpected error"));

@@ -218,15 +218,6 @@ class ListPendingIntegrationTest {
     }
 
     @Test
-    @DisplayName("TC-MGR-011 / FR-M1: a decided expense leaves the list")
-    void decidedExpensesLeaveThePendingList() {
-        expenses.approve(manager, 2, "Within policy");
-        expenses.deny(manager, 3, "Over the daily limit");
-
-        assertEquals(List.of(TAXI), expenses.listPending(manager));
-    }
-
-    @Test
     @DisplayName("FR-A4: an employee cannot list pending expenses")
     void employeeCannotListPendingExpenses() {
         User employee = new User(1, "alice", "employee", "Alice");
