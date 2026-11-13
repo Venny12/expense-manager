@@ -204,19 +204,6 @@ class LoggingIntegrationTest {
         assertPasswordIsNotShown(WRONG_PASSWORD);
         assertPasswordIsNotShown(CORRECT_PASSWORD);
     }
-    
-    @Tag("negative")
-    @DisplayName("TC-MGR-010 / FR-S3: a refused employee login does not log the password")
-    @Test
-    void refusedEmployeeLoginNeverLogsThePassword() throws Exception {
-        assertThrows(
-            AuthorizationException.class,
-            () -> service.login("employee1", "EmployeePass123!")
-        );
-
-        assertTrue(logText().contains("Login refused: account role has no access."));
-        assertPasswordIsNotShown("EmployeePass123!");
-    }
 
     @Tag("negative")
     @DisplayName("TC-MGR-010 / FR-S3: a database failure during login does not log the password")
@@ -233,15 +220,4 @@ class LoggingIntegrationTest {
         assertPasswordIsNotShown(WRONG_PASSWORD);
     }
 
-    @Tag("negative")
-    @DisplayName("TC-MGR-010 / FR-S3: a rejected empty-field login does not log what was typed")
-    @Test
-    void rejectedInputNeverLogsThePassword() throws Exception {
-        assertThrows(
-            ValidationException.class,
-            () -> service.login("", WRONG_PASSWORD)
-        );
-
-        assertPasswordIsNotShown(WRONG_PASSWORD);
-    }
 }

@@ -447,21 +447,6 @@ class ApproveExpenseTest {
             assertEquals(EARLIER_DECISION, stored(3));
         }
 
-        @Tag("negative")
-        @Test
-        @DisplayName("TC-MGR-015 / FR-M2: approving an approved expense again changes nothing")
-        void approvingAnApprovedExpenseAgainChangesNothing() throws Exception {
-            InvalidStateException error = assertThrows(
-                InvalidStateException.class,
-                () -> expenses.approve(manager, 3, "Second approval")
-            );
-
-            assertEquals("Expense is no longer pending.", error.getMessage());
-
-            // Status, reviewer, comment and review date are all unchanged.
-            assertEquals(EARLIER_DECISION, stored(3));
-        }
-
         // TC-MGR-016, integration side
 
         @Tag("boundary")

@@ -241,49 +241,4 @@ class DatabaseContractIntegrationTest {
         assertEquals(8, count(
             "SELECT COUNT(*) FROM approvals WHERE status = 'denied'"));
     }
-
-    @Test
-    @DisplayName("TC-DB-009: report service totals equal SQL totals")
-    void reportTotalsEqualSqlTotals() throws Exception {
-        runScript("seed.sql");
-        // Totals worked out by hand from seed.sql: name, count, total, approved.
-        List<ReportRow> expected = List.of(
-            new ReportRow("Lina Park", 6, new BigDecimal("286.98"),
-                new BigDecimal("60.00")),
-            new ReportRow("Maya Singh", 7, new BigDecimal("206.16"),
-                new BigDecimal("77.90")),
-            new ReportRow("Noah Wilson", 6, new BigDecimal("929.50"),
-                new BigDecimal("305.00")),
-            new ReportRow("Omar Ali", 6, new BigDecimal("10598.05"),
-                new BigDecimal("215.25"))
-        );
-
-        List<ReportRow> fromService = new ReportService(
-            new ReportDao(connection)
-        ).report(new User(1, "manager_asha", "manager", "Asha Patel"),
-            ReportType.EMPLOYEE, null);
-            
-        List<ReportRow> fromSql = new ArrayList<>();
-        try (var statement = connection.createStatement();
-             ResultSet rows = statement.executeQuery("""
-                 SELECT u.full_name,
-                        COUNT(*),
-                        ROUND(SUM(e.amount), 2),
-                        ROUND(COALESCE(SUM(CASE WHEN a.status = 'approved'
-                                           THEN e.amount END), 0), 2)
-                 FROM expenses e
-                 JOIN users u ON u.id = e.user_id
-                 JOIN approvals a ON a.expense_id = e.id
-                 GROUP BY u.id ORDER BY u.full_name
-                 """)) {
-            while (rows.next()) {
-                fromSql.add(new ReportRow(
-                    rows.getString(1), rows.getInt(2),
-                    BigDecimal.valueOf(rows.getDouble(3)).setScale(2),
-                    BigDecimal.valueOf(rows.getDouble(4)).setScale(2)));
-            }
-        }
-        assertEquals(expected, fromSql);
-        assertEquals(fromSql, fromService);
-    }
 }

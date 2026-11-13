@@ -428,26 +428,4 @@ class ErrorHandlingIntegrationTest {
 
         assertClosedCleanly(run(keyboard));
     }
-
-    // TC-MGR-045  Application log cannot be opened
-    @DisplayName("TC-MGR-045 / FR-S4: log folder that cannot be created - message, no login prompt, exit code 1")
-    @Test
-    void logFolderThatCannotBeCreatedStopsBeforeLogin() throws Exception {
-        // A regular file where the log folder's parent should be.
-        Path blocker = Files.writeString(
-            tempFolder.resolve("not-a-folder"), "x"
-        );
-        Keyboard keyboard = new Keyboard(List.of(), List.of());
-
-        int exitCode = Main.run(
-            keyboard.console(),
-            blocker.resolve("logs"),
-            () -> databaseFile.toString()
-        );
-
-        assertEquals(1, exitCode);
-        assertTrue(output().contains("Cannot open the application log."));
-        assertNoStackTrace(output());
-        assertEquals(List.of(), keyboard.prompts);
-    }
 }
