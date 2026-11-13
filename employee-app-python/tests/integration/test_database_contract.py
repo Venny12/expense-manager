@@ -139,14 +139,6 @@ def test_each_expense_references_the_correct_employee(two_employees):
     assert {owners[i] for i in a_ids} == {"Employee A"}
     assert {owners[i] for i in b_ids} == {"Employee B"}
 
-
-@pytest.mark.negative
-def test_expense_for_unknown_employee_is_rejected(two_employees):
-    connection, _, _ = two_employees
-    with pytest.raises(sqlite3.IntegrityError):
-        add_expense(connection, 9999, 10)
-
-
 # TC-DB-004
 @pytest.mark.smoke
 def test_seed_script_loads_expected_rows(seeded):

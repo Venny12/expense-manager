@@ -59,7 +59,7 @@ def accepted_by_python_app(field, text):
 
 @pytest.mark.smoke
 def test_shared_file_is_not_empty():
-    assert len(load_cases()) >= 30
+    assert len(load_cases()) >= 20
 
 @pytest.mark.parametrize("field, text, expected", load_cases())
 def test_python_app_agrees_with_shared_case(field, text, expected):

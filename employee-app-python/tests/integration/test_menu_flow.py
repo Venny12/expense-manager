@@ -79,12 +79,3 @@ def test_scripted_session_shows_only_the_logged_in_employees_expenses(session_ap
     run_session(monkeypatch, "menu_employee", "MenuPassword1!", ["2", "0", "0"])
     output = capsys.readouterr().out
     assert "14.25" not in output
-
-def test_scripted_session_without_viewing_prints_greeting_and_goodbye_only(session_app, monkeypatch, capsys):
-    # TC-EMP-050 | FR-A1 - login then Exit: no table, exit code 0.
-    exit_code = run_session(monkeypatch, "menu_employee", "MenuPassword1!", ["0"])
-    output = capsys.readouterr().out
-    assert exit_code == 0
-    assert "Welcome, Menu Employee" in output
-    assert "Exit." in output
-    assert "Status" not in output

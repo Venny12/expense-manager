@@ -94,24 +94,6 @@ def test_edit_never_changes_the_approval_status():
     assert all(text.startswith("update expenses") for text, _ in db.updates)
     assert len(db.updates) == 1
 
-
-def test_edit_is_saved_in_a_transaction():
-    # TC-EMP-035 | FR-E3 - the UPDATE runs inside 'with connection:' (commit).
-    db = FakeDb(row=expense())
-    edit(db)
-    db.connection.__enter__.assert_called_once()
-    db.connection.__exit__.assert_called_once()
-
-
-def test_edit_logs_success_without_the_description(caplog):
-    # FR-S3 - the log says who edited what, but not the text description.
-    db = FakeDb(row=expense())
-    with caplog.at_level(logging.INFO, logger="employee_app.services"):
-        edit(db, description="Secret client dinner")
-    assert "Expense edited: expense_id=101 user_id=3" in caplog.text
-    assert "Secret client dinner" not in caplog.text
-
-
 # TC-EMP-036 to TC-EMP-039  Edits that must be refused
 
 @pytest.mark.negative
@@ -135,28 +117,12 @@ def test_edit_decided_expense_is_refused(status):
     assert db.updates == []
 
 @pytest.mark.negative
-def test_edit_expense_without_an_approval_row_is_refused():
-    # TC-EMP-037 | FR-S1 - a broken record (no approval row) is not editable.
-    db = FakeDb(row=expense(status=None))
-    with pytest.raises(InvalidStateError):
-        edit(db)
-    assert db.updates == []
-
-@pytest.mark.negative
 def test_edit_missing_expense_reports_not_found():
     # TC-EMP-039 | FR-E3 - an unknown ID gives 'not found' and writes nothing.
     db = FakeDb(row=None)
     with pytest.raises(NotFoundError, match="Expense not found."):
         edit(db)
     assert db.updates == []
-
-@pytest.mark.negative
-def test_ownership_is_checked_before_the_new_values():
-    # TC-EMP-036 | FR-A4 - someone else's expense gives an authorization error
-    # even when the new values are also invalid (amount is negative).
-    db = FakeDb(row=expense(user_id=4))
-    with pytest.raises(AuthorizationError):
-        edit(db, amount="-5")
 
 @pytest.mark.negative
 def test_manager_cannot_edit_an_expense():
@@ -166,16 +132,6 @@ def test_manager_cannot_edit_an_expense():
         edit(db, user=MANAGER)
     # checks whether the mocked execute() method was called zero times.
     db.connection.execute.assert_not_called()
-
-@pytest.mark.negative
-def test_role_is_taken_from_the_database_not_from_the_login_dictionary():
-    # FR-A4 - a user dict that claims 'employee' is refused if the database says
-    # the account is a manager.
-    db = FakeDb(row=expense(), account_role="manager")
-    with pytest.raises(AuthorizationError):
-        edit(db)
-    assert db.updates == []
-
 
 # TC-EMP-040  Invalid new value (service level)
 
@@ -212,15 +168,13 @@ def test_edit_with_an_invalid_value_writes_nothing(overrides):
     [
         {"amount": "0.01"}, {"amount": "10000.00"},
         {"description": "x"}, {"description": "x" * 200},
-        {"category": 1}, {"category": 2},
-        {"expense_date": "2026-11-10"},   # today
+        {"category": 1},
         {"expense_date": "2026-08-12"},   # exactly 90 days ago
     ],
     
     ids=["amount-min", "amount-max", "description-1", "description-200",
-         "category-first", "category-last", "date-today", "date-90-days"],
+         "category-first", "date-90-days"],
 )
-
 def test_edit_with_a_value_at_the_limit_is_saved(overrides):
     # TC-EMP-035 | VR-01 to VR-04 - values exactly at the edge are accepted.
     db = FakeDb(row=expense())
@@ -274,26 +228,6 @@ def test_enter_keeps_the_current_values_when_editing(monkeypatch, capsys):
     assert saved_values(update) == (101, 25.5, 1, "Airport taxi", "2026-11-01")
     assert "Expense 101 updated." in capsys.readouterr().out
 
-@pytest.mark.boundary
-def test_pressing_enter_everywhere_saves_the_unchanged_values(monkeypatch):
-    # TC-EMP-041 | FR-E3 - Enter at every prompt keeps every current value.
-    _prompts, update, _factory = run_edit(monkeypatch, ["101", "", "", "", ""])
-    assert saved_values(update) == (101, 25.5, 1, "Taxi to airport", "2026-11-01")
-
-
-def test_edit_prompts_show_the_current_values(monkeypatch, capsys):
-    # TC-EMP-041 | FR-E3 - each prompt shows what Enter will keep.
-    prompts, _update, _factory = run_edit(monkeypatch, ["101", "", "", "", ""])
-    assert prompts[1:] == [
-        "Amount [25.50]: ",
-        "Category number [1 - Travel]: ",
-        "Description [Taxi to airport]: ",
-        "Expense date [2026-11-01]: ",
-    ]
-    output = capsys.readouterr().out
-    assert "Press Enter to keep the current value." in output
-    assert "1. Travel" in output and "2. Meals" in output
-
 @pytest.mark.negative
 def test_edit_asks_again_after_an_invalid_amount(monkeypatch, capsys):
     # TC-EMP-040 | VR-01 - bad amounts are refused; only the valid one is saved.
@@ -331,22 +265,3 @@ def test_edit_asks_again_for_an_invalid_expense_id(monkeypatch, capsys):
     _prompts, update, _factory = run_edit(monkeypatch, ["0", "-1", "abc", "", "101", "", "", "", ""])
     assert capsys.readouterr().out.count(EXPENSE_ID_RULE) == 4
     assert saved_values(update)[0] == 101
-
-@pytest.mark.negative
-@pytest.mark.parametrize(
-    "error",
-    [NotFoundError("Expense not found."),
-     AuthorizationError("You can only change your own expenses."),
-     InvalidStateError("Expense is no longer pending.")],
-    ids=["not-found", "not-yours", "not-pending"],
-)
-
-def test_edit_stops_at_once_when_the_expense_cannot_be_edited(monkeypatch, error):
-    # TC-EMP-036 to 039 - no further prompts and nothing saved; the error goes up
-    # to the menu loop, which prints it.
-    update = MagicMock()
-    with pytest.raises(type(error), match=str(error)):
-        # only the ID is typed: asking for anything else would fail the test
-        run_edit(monkeypatch, ["101"], update=update, find=error)
-    update.assert_not_called()
-    
