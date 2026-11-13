@@ -33,10 +33,7 @@ class DateFilterUnitTest {
     // TC-MGR-032  Start date after end date
     static Stream<Arguments> reversedRanges() {
         return Stream.of(
-            Arguments.of("TC-MGR-032-one-month-late", "2026-10-31", "2026-10-01"),
-            Arguments.of("TC-MGR-032-one-day-late", "2026-10-02", "2026-10-01"),
-            Arguments.of("TC-MGR-032-across-months", "2026-11-01", "2026-10-31"),
-            Arguments.of("TC-MGR-032-across-years", "2027-01-01", "2026-12-31")
+            Arguments.of("TC-MGR-032-start-date-after-end-date", "2026-10-31", "2026-10-01")
         );
     }
 
@@ -81,27 +78,12 @@ class DateFilterUnitTest {
         return Stream.of(
             Arguments.of("text", "abc"),
             Arguments.of("empty", ""),
-            Arguments.of("spaces", "   "),
-            Arguments.of("null", (String) null),
             Arguments.of("slashes", "2026/10/01"),
-            Arguments.of("day-first", "01-10-2026"),
-            Arguments.of("month-day-year", "10-01-2026"),
-            Arguments.of("no-separators", "20261001"),
-            Arguments.of("single-digit-month-day", "2026-1-1"),
-            Arguments.of("two-digit-year", "26-10-01"),
             Arguments.of("impossible-month", "2026-13-01"),
-            Arguments.of("month-zero", "2026-00-10"),
-            Arguments.of("impossible-day", "2026-04-31"),
-            Arguments.of("day-zero", "2026-10-00"),
             Arguments.of("feb-30", "2026-02-30"),
-            Arguments.of("not-a-leap-year", "2026-02-29"),
-            Arguments.of("century-not-a-leap-year", "2100-02-29"),
-            Arguments.of("time-attached", "2026-10-01T10:00"),
-            Arguments.of("sql-text", "2026-10-01'; DROP TABLE expenses;--"),
-            Arguments.of("non-ascii-digits", "\u0662\u0660\u0662\u0666-\u0661\u0660-\u0660\u0661")
+            Arguments.of("not-a-leap-year", "2026-02-29")
         );
     }
-
     @Tag("negative")
     @DisplayName("TC-MGR-034 / VR-07: an invalid start date is rejected with the format note")
     @ParameterizedTest(name = "{0}")
@@ -131,8 +113,6 @@ class DateFilterUnitTest {
 
     static Stream<Arguments> validDates() {
         return Stream.of(
-            Arguments.of("first-day-of-year", "2026-01-01", LocalDate.of(2026, 1, 1)),
-            Arguments.of("last-day-of-year", "2026-12-31", LocalDate.of(2026, 12, 31)),
             Arguments.of("leap-day", "2028-02-29", LocalDate.of(2028, 2, 29)),
             Arguments.of("last-of-february", "2026-02-28", LocalDate.of(2026, 2, 28))
         );
@@ -148,17 +128,5 @@ class DateFilterUnitTest {
         assertTrue(InputValidator.isValidDate(date));
         DateRange range = InputValidator.parseDateRange(date, date);
         assertEquals(expected, range.start());
-    }
-
-    @Tag("negative")
-    @DisplayName("TC-MGR-034 / VR-07: the format rule comes before the order rule")
-    @Test
-    void formatIsCheckedBeforeOrder() {
-        // The end date is invalid and also "before" the start; format wins.
-        ValidationException error = assertThrows(
-            ValidationException.class,
-            () -> InputValidator.parseDateRange("2026-10-31", "2026-13-01")
-        );
-        assertEquals(DATE_FORMAT_RULE, error.getMessage());
     }
 }

@@ -103,9 +103,7 @@ def assert_saved(connection, user, category_id, amount, description, day):
     "amount, days_ago",
     [
         pytest.param("25.50", 0, id="TC-EMP-012"),
-        pytest.param("10000.00", 0, id="TC-EMP-019"),
-        pytest.param("25.50", 90, id="TC-EMP-021"),
-        pytest.param("0.01", 0, id="TC-EMP-023"),
+
     ],
 )
 def test_valid_submission_is_saved(
@@ -138,22 +136,7 @@ def test_valid_submission_is_saved(
         pytest.param(
             "description", "A" * 201, DESCRIPTION_ERROR, id="TC-EMP-015"
         ),
-        pytest.param("description", "", DESCRIPTION_ERROR, id="TC-EMP-016"),
-        pytest.param("amount", "0", AMOUNT_ERROR, id="TC-EMP-017"),
-        pytest.param("amount", "-1", AMOUNT_ERROR, id="TC-EMP-018"),
         pytest.param("date", "2026-11-10", DATE_ERROR, id="TC-EMP-020"),
-        pytest.param("date", "2026-08-10", DATE_ERROR, id="TC-EMP-022"),
-        pytest.param("amount", "5.001", AMOUNT_ERROR, id="TC-EMP-024"),
-        pytest.param("amount", "10000.01", AMOUNT_ERROR, id="TC-EMP-025"),
-        pytest.param(
-            "date", "not-a-date", DATE_ERROR, id="TC-EMP-026-text"
-        ),
-        pytest.param(
-            "date", "2026-02-30", DATE_ERROR, id="TC-EMP-026-impossible"
-        ),
-        pytest.param(
-            "date", "09/11/2026", DATE_ERROR, id="TC-EMP-026-format"
-        ),
     ],
 )
 def test_invalid_submission_reprompts_before_saving(

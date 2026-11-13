@@ -1,4 +1,4 @@
-# Test Effectiveness Report
+# Test Effectiveness Report - Python and Java
 
 ## Python check
 
@@ -62,3 +62,86 @@ zero. This shows that the test caught the deliberate bug.
 The existing test caught the deliberate zero-amount bug.
 After restoring the original code, all six checks passed again.
 The temporary bug was removed.
+
+
+=================================================================================================
+
+## Java check
+
+**Tester:** Vennela Preethi  
+**Date:** 2026-11-11  
+**Requirement:** VR-06 — Approval comment is optional, 0–200 characters 
+(empty is OK, 201 characters is rejected)  
+**Related test case:** TC-MGR-016 — Approve Expense, approval comment of 200 and 201 characters
+
+### Purpose
+
+Check whether our existing tests catch a bug that wrongly allows an approval comment of 201 characters, one character over the VR-06 limit.
+
+### Test used
+
+**File:** `manager-app-java/src/test/java/com/revature/expensemanager/ApproveExpenseTest.java`
+
+**Tests:**
+
+- `ApprovalRules.approvalCommentLengthLimit` (unit, 4 cases: 200 accepted, 201 rejected, and both again with spaces around the comment).
+- `ApprovalWithRealDatabase.tooLongCommentAsksAgainAndSavesNothing` (integration, a 201-character comment through the real menu).
+
+All 22 tests in the file were run during the experiment.
+
+### Temporary bug
+
+In `manager-app-java/src/main/java/com/revature/expensemanager/validation/CommentValidator.java`, method `isValidApproval`, we changed:
+
+**Original:**
+
+```java
+return comment == null || comment.trim().length() <= MAX_LENGTH;
+```
+
+**Temporary bug:**
+
+```java
+return comment == null || comment.trim().length() <= MAX_LENGTH + 1;
+```
+
+The limit moved from 200 to 201, so a 201-character comment passed validation.
+
+### Results
+
+| Stage | Result |
+|---|---|
+| Before introducing the bug | 22 passed |
+| With the temporary bug | 3 failed, 19 passed |
+| After restoring the original code | 22 passed |
+
+**The three failing tests:**
+
+1. `approvalCommentLengthLimit[TC-MGR-016-201-characters]` — expected a `ValidationException`, but the comment was accepted and the code went on to the database lookup (`NotFoundException`).
+2. `approvalCommentLengthLimit[TC-MGR-016-201-plus-outer-spaces]` — the same failure with spaces around the comment.
+3. `tooLongCommentAsksAgainAndSavesNothing` — the 201-character comment was accepted instead of the menu asking again.
+
+The 200-character cases still passed, as they should: the bug only moved the upper limit. This shows that the tests catch the deliberate bug.
+
+
+### Evidence
+
+- Bug detected: `docs/evidence/java-effectiveness-bug.html`
+- Code restored: `docs/evidence/java-effectiveness-restore.html`
+
+These two files are console output from the run described above. 
+For the official report, repeat the run with Maven on the team machine (steps below).
+
+1. Make the temporary change, then run:
+
+   ```powershell
+   mvn test -Dtest=ApproveExpenseTest surefire-report:report-only
+   ```
+
+   Keep the report as `java-effectiveness-bug.html`.
+
+2. Restore the original line, run the same command, and keep the report as `java-effectiveness-restore.html`.
+
+### Conclusion
+
+The existing tests caught the deliberate 201-character bug. After restoring the original code, all 22 tests passed again. The temporary bug was removed.

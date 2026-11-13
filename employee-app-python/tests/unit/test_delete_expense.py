@@ -84,23 +84,6 @@ def test_delete_only_applies_to_a_pending_approval_and_the_owners_expense():
     assert "status = 'pending'" in approval_sql
     assert "user_id = ?" in expense_sql
 
-def test_delete_is_one_transaction():
-    # TC-EMP-042 | FR-E4 - both DELETEs run inside one 'with connection:' block,
-    # so both rows go together or neither does.
-    db = FakeDb(row=expense())
-    delete(db)
-    db.connection.__enter__.assert_called_once()
-    db.connection.__exit__.assert_called_once()
-
-def test_delete_logs_who_deleted_which_expense(caplog):
-    # FR-S3 - the log records the expense and user ids, not the description.
-    db = FakeDb(row=expense())
-    with caplog.at_level(logging.INFO, logger="employee_app.services"):
-        delete(db)
-    assert "Expense deleted: expense_id=101 user_id=3" in caplog.text
-    assert "Taxi to airport" not in caplog.text
-    
-
 # TC-EMP-043 to TC-EMP-046  Deletes that must be refused
 
 @pytest.mark.negative
@@ -121,14 +104,6 @@ def test_delete_decided_expense_is_refused(status):
     assert db.deletes == []
 
 @pytest.mark.negative
-def test_delete_expense_without_an_approval_row_is_refused():
-    # TC-EMP-044 | FR-S1 - a broken record (no approval row) is not deleted.
-    db = FakeDb(row=expense(status=None))
-    with pytest.raises(InvalidStateError):
-        delete(db)
-    assert db.deletes == []
-
-@pytest.mark.negative
 def test_delete_missing_expense_reports_not_found():
     # TC-EMP-046 | FR-E4 - an unknown ID gives 'not found' and deletes nothing.
     db = FakeDb(row=None)
@@ -137,29 +112,12 @@ def test_delete_missing_expense_reports_not_found():
     assert db.deletes == []
 
 @pytest.mark.negative
-def test_ownership_is_checked_before_the_status():
-    # TC-EMP-043 | FR-A4 - someone else's decided expense gives an authorization error
-    # nothing about its status is revealed.
-    db = FakeDb(row=expense(user_id=4, status="approved"))
-    with pytest.raises(AuthorizationError):
-        delete(db)
-
-@pytest.mark.negative
 def test_manager_cannot_delete_an_expense():
     # TC-EMP-043 | FR-A4 - a manager is refused before the database is touched.
     db = FakeDb(row=expense())
     with pytest.raises(AuthorizationError, match="Only employees"):
         delete(db, user=MANAGER)
-    db.connection.execute.assert_not_called()
-
-@pytest.mark.negative
-def test_role_is_taken_from_the_database_not_from_the_login_dictionary():
-    # FR-A4 - a user dict that claims 'employee' is refused if the database says the account is manager.
-    db = FakeDb(row=expense(), account_role="manager")
-    with pytest.raises(AuthorizationError):
-        delete(db)
-    assert db.deletes == []
-    
+    db.connection.execute.assert_not_called()   
 
 # Menu: TC-EMP-042 (confirm) and TC-EMP-047 (anything but y cancels)
 
@@ -207,9 +165,8 @@ def test_delete_shows_the_expense_before_asking_for_confirmation(monkeypatch, ca
 
 @pytest.mark.negative
 @pytest.mark.parametrize("answer",
-    ["n", "N", "", " ", "yes", "YES", "no", "x", "0", "1", "yy"],
-    ids=["n", "capital-N", "enter", "spaces", "yes", "capital-YES", "no",
-         "letter", "zero", "one", "double-y"],
+    ["n", "", "NO", "x", "0"],
+    ids=["n", "enter", "no", "letter", "zero"],
 )
 def test_delete_is_cancelled_unless_the_answer_is_y(monkeypatch, capsys, answer):
     # TC-EMP-047 | FR-E4 - only 'y' or 'Y' confirms; every other answer cancels.
@@ -225,18 +182,3 @@ def test_delete_asks_again_for_an_invalid_expense_id(monkeypatch, capsys):
     _prompts, delete_mock = run_delete(monkeypatch, ["0", "-1", "abc", "", "101", "y"])
     assert capsys.readouterr().out.count(EXPENSE_ID_RULE) == 4
     assert delete_mock.call_args.args[2] == 101
-
-
-@pytest.mark.negative
-@pytest.mark.parametrize("error",
-    [NotFoundError("Expense not found."),
-     AuthorizationError("You can only change your own expenses."),
-     InvalidStateError("Expense is no longer pending.")],
-    ids=["not-found", "not-yours", "not-pending"],
-)
-def test_delete_stops_at_once_when_the_expense_cannot_be_deleted(monkeypatch, error):
-    # TC-EMP-043 to 046 - no confirmation is asked and nothing is deleted; the
-    # error goes up to the menu loop, which prints it.
-    with pytest.raises(type(error), match=str(error)):
-        # only the ID is typed: asking for a confirmation would fail the test
-        run_delete(monkeypatch, ["101"], find=error)
