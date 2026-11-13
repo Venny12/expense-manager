@@ -1,4 +1,4 @@
-# Expense Manager — Test Summary
+# Expense Manager - Test Summary
 
 **Team:** Shaqayeq Salimy and Vennela Preethi
 
