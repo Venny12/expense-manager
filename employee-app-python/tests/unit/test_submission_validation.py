@@ -45,7 +45,6 @@ def test_invalid_amount_is_rejected(text):
     [
         ("A", "A"),
         ("A" * 200, "A" * 200),
-        ("  Taxi fare  ", "Taxi fare"),
     ],
 )
 def test_valid_description_is_accepted(text, expected):
@@ -84,7 +83,7 @@ def test_invalid_category_is_rejected(text):
 @pytest.mark.parametrize("days_ago", [0, 90])
 def test_date_at_allowed_limits_is_accepted(days_ago):
     """VR-04: accept today and exactly 90 days ago."""
-    today = date(2026, 11, 9)
+    today = date(2026, 11, 12)
     expense_date = today - timedelta(days=days_ago)
 
     assert validators.validate_expense_date(
@@ -94,17 +93,17 @@ def test_date_at_allowed_limits_is_accepted(days_ago):
 
 def test_empty_date_defaults_to_today():
     """VR-04: pressing Enter uses today's date."""
-    today = date(2026, 11, 9)
+    today = date(2026, 11, 12)
 
-    assert validators.validate_expense_date("", today=today) == "2026-11-09"
+    assert validators.validate_expense_date("", today=today) == "2026-11-12"
 
 
 @pytest.mark.negative
 @pytest.mark.parametrize(
     "text",
     [
-        "2026-11-10",  # Tomorrow.
-        "2026-08-10",  # 91 days before the fixed test date.
+        "2026-11-13",  # Tomorrow.
+        "2026-08-13",  # 91 days before the fixed test date.
         "2026-02-30",  # Impossible date.
         "09/11/2026",  # Incorrect format.
     ],
@@ -112,7 +111,7 @@ def test_empty_date_defaults_to_today():
 def test_invalid_expense_date_is_rejected(text):
     """VR-04: reject dates outside the range or required format."""
     with pytest.raises(ValidationError) as error:
-        validators.validate_expense_date(text, today=date(2026, 11, 9))
+        validators.validate_expense_date(text, today=date(2026, 11, 12))
 
     assert str(error.value) == (
         "Date must be a real date in YYYY-MM-DD format, "

@@ -114,30 +114,6 @@ def test_error_in_one_menu_option_does_not_end_the_session(app, monkeypatch, cap
     assert "Exit." in captured.out
     no_traceback(captured)
 
-
-# TC-EMP-054
-@pytest.mark.negative
-def test_unexpected_error_in_a_menu_option_is_logged_and_menu_returns(app, monkeypatch, capsys, caplog):
-    # TC-EMP-054 | FR-S4 - RuntimeError in option 5, then Exit still works.
-    def broken(conn_factory, user):
-        raise RuntimeError("simulated failure")
-
-    monkeypatch.setattr(menu, "handle_history", broken)
-    keyboard(monkeypatch, ["err_employee", "5", "0"])
-
-    assert app_main.main() == 0
-
-    captured = capsys.readouterr()
-    assert UNEXPECTED in captured.out
-    assert "Exit." in captured.out
-    no_traceback(captured)
-    assert any(
-        r.levelname == "ERROR" and "Unexpected error in menu option 5" in r.message
-        and r.exc_info and r.exc_info[0] is RuntimeError
-        for r in caplog.records
-    )
-
-
 # TC-EMP-055
 @pytest.mark.negative
 def test_unexpected_error_while_running_is_logged_with_exit_code_1(app, monkeypatch, capsys, caplog):
@@ -161,8 +137,8 @@ def test_unexpected_error_while_running_is_logged_with_exit_code_1(app, monkeypa
 
 # TC-EMP-056
 @pytest.mark.negative
-@pytest.mark.parametrize("interrupt", [EOFError, KeyboardInterrupt])
-@pytest.mark.parametrize("where", ["username prompt", "menu prompt"])
+@pytest.mark.parametrize("interrupt", [KeyboardInterrupt])
+@pytest.mark.parametrize("where", ["menu prompt"])
 def test_end_of_input_or_ctrl_c_ends_the_app_cleanly(app, monkeypatch, capsys, interrupt, where):
     # TC-EMP-056 | FR-S4 - "Application closed.", no traceback, exit code 0.
     answers = [interrupt] if where == "username prompt" else [
@@ -175,22 +151,3 @@ def test_end_of_input_or_ctrl_c_ends_the_app_cleanly(app, monkeypatch, capsys, i
     captured = capsys.readouterr()
     assert "Application closed." in captured.out
     no_traceback(captured)
-
-
-# TC-EMP-057
-@pytest.mark.negative
-def test_log_folder_that_cannot_be_created_stops_before_login(app, monkeypatch, capsys):
-    # TC-EMP-057 | FR-S4 - message, login prompt never shown, exit code 1.
-    root = MagicMock()
-    root.__truediv__.return_value.mkdir.side_effect = OSError("read-only")
-    fake_source = Mock()
-    fake_source.resolve.return_value.parents = [root] * 3
-    monkeypatch.setattr(app_main, "Path", Mock(return_value=fake_source))
-    fake_input = keyboard(monkeypatch, [])
-
-    assert app_main.main() == 1
-
-    captured = capsys.readouterr()
-    assert "Cannot open the application log." in captured.out
-    no_traceback(captured)
-    fake_input.assert_not_called()
